@@ -598,10 +598,10 @@ io.on('connection', (socket) => {
     }
 
     if (gameOver) {
-      room.players.forEach((p) =>
+      room.players.forEach((p) => {
         if (!p.socketId) return;
-        io.to(p.socketId).emit('game_over', { winnerId: gameOver, flagCapture: !combatResult })
-      );
+        io.to(p.socketId).emit('game_over', { winnerId: gameOver, flagCapture: !combatResult });
+      });
     }
   });
 
