@@ -179,6 +179,9 @@ function resolveTieBreaker(room) {
     io.to(p.socketId).emit('tie_break_resolved', { combatResult, attackerId, newGameState: entry });
   });
   if (gameOver) {
+    room.rematchRequested = {};
+    room.lastWinnerId = gameOver;
+    room.lastFlagCapture = false;
     room.players.forEach((p) => {
       if (!p.socketId) return;
       io.to(p.socketId).emit('game_over', { winnerId: gameOver, flagCapture: false });
@@ -235,6 +238,11 @@ function startSetupPhase(room) {
   room.setupGrid = createEmptyGrid();
   room.setupReady = {};
   room.setupTimerEnd = Date.now() + SETUP_DURATION_SEC * 1000;
+  room.gameState = null;
+  room.tieBreaker = null;
+  room.rematchRequested = null;
+  room.lastWinnerId = null;
+  room.lastFlagCapture = null;
 
   room.players.forEach((p) => {
     room.setupReady[p.id] = false;
@@ -370,6 +378,9 @@ function executeMove(room, fromRow, fromCol, toRow, toCol, movingPlayerId) {
       clearInterval(room.turnTimerInterval);
       room.turnTimerInterval = null;
     }
+    room.rematchRequested = {};
+    room.lastWinnerId = gameOver;
+    room.lastFlagCapture = !combatResult;
     room.players.forEach((p) => {
       if (!p.socketId) return;
       io.to(p.socketId).emit('game_over', { winnerId: gameOver, flagCapture: !combatResult });
@@ -461,6 +472,9 @@ io.on('connection', (socket) => {
         const sanitized = sanitizeGameStateForPlayer(room.gameState, pid);
         socket.emit('game_state_update', { gameState: sanitized });
         socket.emit('tie_break_start', { deadline: room.tieBreaker.deadline, unitType: room.tieBreaker.unitType || 'rock' });
+      } else if (room.phase === 'GAME_OVER' && room.lastWinnerId != null) {
+        socket.emit('game_over', { winnerId: room.lastWinnerId, flagCapture: !!room.lastFlagCapture });
+        socket.emit('rematch_update', { rematchRequested: room.rematchRequested ?? {} });
       }
       return;
     }
@@ -668,6 +682,23 @@ io.on('connection', (socket) => {
     if (!isToEmpty && !isToEnemy) return;
 
     executeMove(room, fromRow, fromCol, toRow, toCol, socket.playerId);
+  });
+
+  socket.on('request_rematch', () => {
+    if (!socket.roomId) return;
+    const room = rooms.get(socket.roomId);
+    if (!room || room.phase !== 'GAME_OVER') return;
+    if (!room.rematchRequested) room.rematchRequested = {};
+    room.rematchRequested[socket.playerId] = true;
+    const connectedPlayers = room.players.filter((p) => p.socketId);
+    const bothRequested = connectedPlayers.every((p) => room.rematchRequested[p.id]);
+    room.players.forEach((p) => {
+      if (!p.socketId) return;
+      io.to(p.socketId).emit('rematch_update', { rematchRequested: { ...room.rematchRequested } });
+    });
+    if (bothRequested && connectedPlayers.length === 2) {
+      startSetupPhase(room);
+    }
   });
 
   socket.on('submit_tie_choice', ({ choice }) => {

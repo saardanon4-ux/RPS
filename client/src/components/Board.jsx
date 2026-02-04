@@ -28,7 +28,11 @@ const IMMOBILE_TYPES = ['flag', 'trap'];
 const TILE_BASE =
   'flex-1 min-w-0 aspect-square flex items-center justify-center p-1 text-xl sm:text-2xl font-medium transition-all duration-200 cursor-pointer select-none hover:brightness-110';
 
-function GameOverOverlay({ winner }) {
+function GameOverOverlay({ winner, rematchRequested, requestRematch, playerId }) {
+  const iRequested = rematchRequested?.[playerId];
+  const otherRequested = Object.keys(rematchRequested ?? {}).some((id) => id !== playerId && rematchRequested[id]);
+  const bothReady = iRequested && otherRequested;
+
   useEffect(() => {
     if (winner) {
       confetti({ particleCount: 80, spread: 100, origin: { y: 0.6 } });
@@ -38,10 +42,18 @@ function GameOverOverlay({ winner }) {
   }, [winner]);
   return (
     <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10 rounded-lg">
-      <div className="bg-white dark:bg-stone-800 p-6 rounded-xl shadow-xl text-center max-w-xs">
+      <div className="bg-white dark:bg-stone-800 p-6 rounded-xl shadow-xl text-center max-w-xs space-y-4">
         <p className="text-xl font-bold">
           {winner ? '🏆 You Win!' : '😔 You Lose'}
         </p>
+        <button
+          type="button"
+          onClick={requestRematch}
+          disabled={iRequested}
+          className="w-full px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-amber-600 disabled:cursor-default text-white font-medium transition-colors"
+        >
+          {bothReady ? 'Starting rematch...' : iRequested ? 'Waiting for opponent...' : 'Rematch'}
+        </button>
       </div>
     </div>
   );
@@ -57,7 +69,7 @@ function getAdjacentKeys(row, col) {
 }
 
 export default function Board() {
-  const { gameState, playerId, gameOver, combatState, clearCombatAndApplyState, tieBreakerState, submitTieChoice, makeMove } = useGame();
+  const { gameState, playerId, gameOver, combatState, clearCombatAndApplyState, tieBreakerState, submitTieChoice, rematchRequested, requestRematch, makeMove } = useGame();
   const [selected, setSelected] = useState(null); // { row, col }
 
   const hasValidGame = gameState && Array.isArray(gameState.grid) && gameState.grid.length > 0;
@@ -158,11 +170,19 @@ export default function Board() {
         {gameOver?.flagCapture && (
           <FlagCaptureCelebration
             won={gameOver.winnerId === playerId}
+            rematchRequested={rematchRequested}
+            requestRematch={requestRematch}
+            playerId={playerId}
             onComplete={() => {}}
           />
         )}
         {gameOver && !gameOver.flagCapture && (
-          <GameOverOverlay winner={gameOver.winnerId === playerId} />
+          <GameOverOverlay
+            winner={gameOver.winnerId === playerId}
+            rematchRequested={rematchRequested}
+            requestRematch={requestRematch}
+            playerId={playerId}
+          />
         )}
         {Array.from({ length: GRID_SIZE }, (_, row) => (
           <div key={row} className="flex flex-1 min-h-0">

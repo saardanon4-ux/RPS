@@ -4,7 +4,10 @@ import confetti from 'canvas-confetti';
 
 const VIDEO_DURATION_MS = 4000;
 
-export default function FlagCaptureCelebration({ won, onComplete }) {
+export default function FlagCaptureCelebration({ won, onComplete, rematchRequested, requestRematch, playerId }) {
+  const iRequested = rematchRequested?.[playerId];
+  const otherRequested = Object.keys(rematchRequested ?? {}).some((id) => id !== playerId && rematchRequested[id]);
+  const bothReady = iRequested && otherRequested;
   const [showVideo, setShowVideo] = useState(won);
 
   useEffect(() => {
@@ -112,6 +115,14 @@ export default function FlagCaptureCelebration({ won, onComplete }) {
           >
             🎉🎊🥳🎉🎊
           </motion.div>
+          <button
+            type="button"
+            onClick={requestRematch}
+            disabled={iRequested}
+            className="mt-6 w-full px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-amber-600 disabled:cursor-default text-white font-medium transition-colors"
+          >
+            {bothReady ? 'Starting rematch...' : iRequested ? 'Waiting for opponent...' : 'Rematch'}
+          </button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -138,6 +149,14 @@ export default function FlagCaptureCelebration({ won, onComplete }) {
         </motion.p>
         <p className="text-xl font-bold text-stone-400">Your flag was captured</p>
         <p className="text-2xl font-black text-red-500 mt-2">😔 You Lose</p>
+        <button
+          type="button"
+          onClick={requestRematch}
+          disabled={iRequested}
+          className="mt-6 w-full px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-amber-600 disabled:cursor-default text-white font-medium transition-colors"
+        >
+          {bothReady ? 'Starting rematch...' : iRequested ? 'Waiting for opponent...' : 'Rematch'}
+        </button>
       </motion.div>
     </motion.div>
   );

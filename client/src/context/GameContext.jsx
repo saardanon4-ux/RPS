@@ -22,6 +22,7 @@ export function GameProvider({ children }) {
   const [setupGrid, setSetupGrid] = useState(null);
   const [setupReady, setSetupReady] = useState({});
   const [setupTimer, setSetupTimer] = useState(null);
+  const [rematchRequested, setRematchRequested] = useState({});
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState(null);
   const stateRef = useRef({ roomId: '', player: null });
@@ -89,6 +90,7 @@ export function GameProvider({ children }) {
       setSetupReady(sr ?? {});
       setGameState(null);
       setGameOver(null);
+      setRematchRequested({});
     });
 
     s.on('setup_update', ({ grid, setupReady: sr }) => {
@@ -154,6 +156,11 @@ export function GameProvider({ children }) {
     s.on('game_over', ({ winnerId, flagCapture }) => {
       setGameOver({ winnerId, flagCapture: !!flagCapture });
       setTieBreakerState(null);
+      setRematchRequested({});
+    });
+
+    s.on('rematch_update', ({ rematchRequested: rr }) => {
+      setRematchRequested(rr ?? {});
     });
 
     setSocket(s);
@@ -201,6 +208,7 @@ export function GameProvider({ children }) {
     setSetupGrid(null);
     setSetupReady({});
     setSetupTimer(null);
+    setRematchRequested({});
   };
 
   const placeUnit = (row, col, type) => {
@@ -227,6 +235,10 @@ export function GameProvider({ children }) {
     if (socket) socket.emit('submit_tie_choice', { choice });
   };
 
+  const requestRematch = () => {
+    if (socket) socket.emit('request_rematch');
+  };
+
   const clearCombatAndApplyState = () => {
     setCombatState(null);
     if (pendingGameState) {
@@ -249,6 +261,8 @@ export function GameProvider({ children }) {
         clearCombatAndApplyState,
         tieBreakerState,
         submitTieChoice,
+        rematchRequested,
+        requestRematch,
         makeMove,
         phase,
         setupPhase,

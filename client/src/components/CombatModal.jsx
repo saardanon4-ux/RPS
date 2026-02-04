@@ -18,12 +18,66 @@ function getResultLabel(result, attackerId, playerId) {
   return iWon ? 'WIN!' : 'LOSE';
 }
 
+// --- Animation variants by scenario ---
+
+// Paper (left) wraps right; Paper (right) wraps left. Attacker=left(+5), Defender=right(-5)
+const PAPER_COVERS_ROCK = {
+  winnerAttacker: {
+    scale: 1.5,
+    x: 50,
+    zIndex: 50,
+    transition: { duration: 0.55, ease: 'easeOut' },
+  },
+  winnerDefender: {
+    scale: 1.5,
+    x: -50,
+    zIndex: 50,
+    transition: { duration: 0.55, ease: 'easeOut' },
+  },
+  loser: {
+    scale: 0,
+    opacity: 0,
+    transition: { delay: 0.35, duration: 0.45, ease: 'easeIn' },
+  },
+};
+
+const ROCK_SMASHES_SCISSORS = {
+  winner: {
+    x: 0,
+    scale: [1, 1.35, 1.15],
+    y: [0, -25, 40],
+    transition: { duration: 0.5, times: [0, 0.25, 1], ease: 'easeOut' },
+  },
+  loser: {
+    rotate: 90,
+    x: [0, 70],
+    y: [0, -30],
+    scale: [1, 0.5, 0.3],
+    opacity: [1, 0.8, 0],
+    transition: { duration: 0.55, delay: 0.15 },
+  },
+};
+
+const SCISSORS_CUTS_PAPER = {
+  winner: {
+    rotate: [0, -30, 30, -25, 25, 0],
+    scale: [1, 1.25, 1.15],
+    transition: { duration: 0.5, times: [0, 0.12, 0.28, 0.42, 0.58, 1] },
+  },
+  loser: {
+    opacity: [1, 0.7, 0],
+    scale: [1, 1.15, 0.4],
+    x: [0, -20],
+    transition: { duration: 0.35, delay: 0.1 },
+  },
+};
+
 function ScissorsFragments({ visible }) {
   const offsets = [
-    { x: -40, y: -25, rotate: -30 },
-    { x: 45, y: -30, rotate: 20 },
-    { x: -25, y: 35, rotate: 15 },
-    { x: 35, y: 25, rotate: -25 },
+    { x: -45, y: -30, rotate: -35 },
+    { x: 50, y: -35, rotate: 25 },
+    { x: -30, y: 40, rotate: 20 },
+    { x: 40, y: 30, rotate: -30 },
   ];
   if (!visible) return null;
   return (
@@ -31,16 +85,16 @@ function ScissorsFragments({ visible }) {
       {offsets.map((o, i) => (
         <motion.span
           key={i}
-          className="absolute text-2xl opacity-80"
+          className="absolute text-2xl"
           initial={{ scale: 0.3, x: 0, y: 0, opacity: 1 }}
           animate={{
-            scale: [0.3, 0.6, 0.4],
+            scale: [0.3, 0.7, 0.4],
             x: o.x,
             y: o.y,
             rotate: o.rotate,
             opacity: [1, 0.8, 0],
           }}
-          transition={{ duration: 0.6, delay: 0.1 }}
+          transition={{ duration: 0.55, delay: 0.05 }}
         >
           ✂️
         </motion.span>
@@ -51,10 +105,10 @@ function ScissorsFragments({ visible }) {
 
 function PaperPieces({ visible }) {
   const pieces = [
-    { x: -35, y: -20, rotate: -45 },
-    { x: 40, y: -25, rotate: 30 },
-    { x: -20, y: 30, rotate: 20 },
-    { x: 30, y: 25, rotate: -40 },
+    { x: -40, y: -25, rotate: -50 },
+    { x: 45, y: -30, rotate: 35 },
+    { x: -25, y: 35, rotate: 25 },
+    { x: 35, y: 30, rotate: -45 },
   ];
   if (!visible) return null;
   return (
@@ -62,16 +116,16 @@ function PaperPieces({ visible }) {
       {pieces.map((o, i) => (
         <motion.span
           key={i}
-          className="absolute text-2xl opacity-90"
+          className="absolute text-2xl"
           initial={{ scale: 0.4, x: 0, y: 0, opacity: 1 }}
           animate={{
-            scale: [0.4, 0.7, 0.5],
+            scale: [0.4, 0.8, 0.5],
             x: o.x,
             y: o.y,
             rotate: o.rotate,
             opacity: [1, 0.7, 0],
           }}
-          transition={{ duration: 0.6, delay: 0.1 }}
+          transition={{ duration: 0.55, delay: 0.05 }}
         >
           📄
         </motion.span>
@@ -80,8 +134,23 @@ function PaperPieces({ visible }) {
   );
 }
 
+function getAnimationVariant(winnerMove, loserMove, unitType, isAttacker) {
+  const isWinner = unitType === winnerMove;
+  if (winnerMove === 'paper' && loserMove === 'rock') {
+    if (isWinner) return isAttacker ? PAPER_COVERS_ROCK.winnerAttacker : PAPER_COVERS_ROCK.winnerDefender;
+    return PAPER_COVERS_ROCK.loser;
+  }
+  if (winnerMove === 'rock' && loserMove === 'scissors') {
+    return isWinner ? ROCK_SMASHES_SCISSORS.winner : ROCK_SMASHES_SCISSORS.loser;
+  }
+  if (winnerMove === 'scissors' && loserMove === 'paper') {
+    return isWinner ? SCISSORS_CUTS_PAPER.winner : SCISSORS_CUTS_PAPER.loser;
+  }
+  return null;
+}
+
 export default function CombatModal({ combatState, playerId, onComplete }) {
-  const [phase, setPhase] = useState('approach'); // approach -> clash -> impact
+  const [phase, setPhase] = useState('approach');
 
   useEffect(() => {
     if (!combatState) return;
@@ -111,12 +180,16 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
 
   const winnerType = attackerWins ? attackerType : defenderType;
   const loserType = attackerWins ? defenderType : attackerType;
-  const paperWrapsRock = winnerType === 'paper' && loserType === 'rock';
+  const paperCoversRock = winnerType === 'paper' && loserType === 'rock';
   const rockSmashesScissors = winnerType === 'rock' && loserType === 'scissors';
   const scissorsCutsPaper = winnerType === 'scissors' && loserType === 'paper';
 
+  const attackerVariant = getAnimationVariant(winnerType, loserType, attackerType, true);
+  const defenderVariant = getAnimationVariant(winnerType, loserType, defenderType, false);
+
   const showScissorsFragments = rockSmashesScissors && phase === 'impact';
   const showPaperPieces = scissorsCutsPaper && phase === 'impact';
+
 
   return (
     <motion.div
@@ -129,8 +202,8 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
     >
       <motion.div
         className="flex flex-col items-center gap-8 px-10 py-8 bg-stone-900/90 rounded-2xl border-2 border-amber-500/40 shadow-2xl"
-        animate={phase === 'impact' ? { x: [0, -8, 8, -5, 5, 0] } : {}}
-        transition={{ duration: 0.35 }}
+        animate={phase === 'impact' && (rockSmashesScissors || isTrap) ? { x: [0, -10, 10, -6, 6, 0] } : {}}
+        transition={{ duration: 0.4 }}
       >
         <motion.p
           className="text-amber-400 font-bold text-xs uppercase tracking-[0.2em]"
@@ -144,20 +217,17 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
         <div className="flex items-center gap-4 relative min-h-[140px] w-[280px] justify-center">
           {showScissorsFragments && <ScissorsFragments visible />}
           {showPaperPieces && <PaperPieces visible />}
-          {/* Attacker - approaches from left toward center */}
+
+          {/* Attacker - left side */}
           <motion.div
-            className={`flex flex-col items-center gap-2 relative ${paperWrapsRock && attackerType === 'paper' ? 'z-20' : 'z-10'}`}
+            className={`flex flex-col items-center gap-2 relative ${paperCoversRock && attackerType === 'paper' ? 'z-[50]' : 'z-10'}`}
             initial={{ x: -100, opacity: 0 }}
             animate={
               phase === 'approach' || phase === 'clash' || phase === 'impact'
                 ? { x: 5, opacity: 1 }
                 : { x: 5, opacity: 1 }
             }
-            transition={
-              phase === 'approach'
-                ? { type: 'spring', stiffness: 120, damping: 18 }
-                : {}
-            }
+            transition={phase === 'approach' ? { type: 'spring', stiffness: 120, damping: 18 } : {}}
           >
             <motion.span
               className="block text-5xl sm:text-6xl"
@@ -169,24 +239,14 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
                     ? { scale: [1, 0.8, 0.6], y: [0, 5, 10], opacity: [1, 0.8, 0] }
                     : bothDestroyed
                       ? { scale: [1, 1.4, 0], opacity: [1, 0.8, 0] }
-                      : paperWrapsRock && attackerType === 'paper'
-                        ? { scale: [1, 3.2], x: [0, 50] }
-                        : paperWrapsRock && attackerType === 'rock'
-                          ? { scale: [1, 0.3], opacity: [1, 0] }
-                        : rockSmashesScissors && attackerType === 'rock'
-                          ? { scale: [1, 2], y: [0, -15, 20] }
-                        : rockSmashesScissors && attackerType === 'scissors'
-                          ? { scale: [1, 0.6, 0], opacity: [1, 0.3, 0] }
-                        : scissorsCutsPaper && attackerType === 'scissors'
-                          ? { rotate: [0, -35, 35, -30, 30, 0], scale: [1, 1.3] }
-                        : scissorsCutsPaper && attackerType === 'paper'
-                          ? { scale: [1, 0.6, 0], opacity: [1, 0.3, 0] }
+                      : attackerVariant
+                        ? attackerVariant
                         : attackerWins
                           ? { scale: [1, 1.5, 1.2] }
                           : { scale: [1, 0.5], opacity: [1, 0] }
                   : {}
               }
-              transition={{ duration: 0.65 }}
+              transition={phase === 'impact' && attackerVariant ? {} : { duration: 0.6 }}
             >
               {attackerEmoji}
             </motion.span>
@@ -204,20 +264,16 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
             </motion.span>
           )}
 
-          {/* Defender - approaches from right toward center */}
+          {/* Defender - right side */}
           <motion.div
-            className={`flex flex-col items-center gap-2 relative ${paperWrapsRock && defenderType === 'paper' ? 'z-20' : 'z-10'}`}
+            className={`flex flex-col items-center gap-2 relative ${paperCoversRock && defenderType === 'paper' ? 'z-[50]' : 'z-10'}`}
             initial={{ x: 100, opacity: 0 }}
             animate={
               phase === 'approach' || phase === 'clash' || phase === 'impact'
                 ? { x: -5, opacity: 1 }
                 : { x: -5, opacity: 1 }
             }
-            transition={
-              phase === 'approach'
-                ? { type: 'spring', stiffness: 120, damping: 18 }
-                : {}
-            }
+            transition={phase === 'approach' ? { type: 'spring', stiffness: 120, damping: 18 } : {}}
           >
             {isTrap && phase === 'impact' && (
               <motion.div
@@ -226,38 +282,17 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.3 }}
               >
-                <motion.span
-                  className="absolute text-5xl text-emerald-600 -top-4 -left-2"
-                  initial={{ scale: 0.2, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 0.95 }}
-                  transition={{ duration: 0.35 }}
-                >
-                  🌿
-                </motion.span>
-                <motion.span
-                  className="absolute text-5xl text-emerald-600 -top-4 -right-2"
-                  initial={{ scale: 0.2, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 0.95 }}
-                  transition={{ duration: 0.35, delay: 0.05 }}
-                >
-                  🌿
-                </motion.span>
-                <motion.span
-                  className="absolute text-5xl text-emerald-600 -bottom-2 left-0"
-                  initial={{ scale: 0.2, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 0.95 }}
-                  transition={{ duration: 0.35, delay: 0.1 }}
-                >
-                  🌿
-                </motion.span>
-                <motion.span
-                  className="absolute text-5xl text-emerald-600 -bottom-2 right-0"
-                  initial={{ scale: 0.2, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 0.95 }}
-                  transition={{ duration: 0.35, delay: 0.15 }}
-                >
-                  🌿
-                </motion.span>
+                {['-top-4 -left-2', '-top-4 -right-2', '-bottom-2 left-0', '-bottom-2 right-0'].map((pos, i) => (
+                  <motion.span
+                    key={i}
+                    className={`absolute text-5xl text-emerald-600 ${pos}`}
+                    initial={{ scale: 0.2, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 0.95 }}
+                    transition={{ duration: 0.35, delay: i * 0.05 }}
+                  >
+                    🌿
+                  </motion.span>
+                ))}
               </motion.div>
             )}
             <motion.span
@@ -270,24 +305,14 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
                     ? {}
                     : bothDestroyed
                       ? { scale: [1, 1.4, 0], opacity: [1, 0.8, 0] }
-                      : paperWrapsRock && defenderType === 'paper'
-                        ? { scale: [1, 3.2], x: [0, -50] }
-                        : paperWrapsRock && defenderType === 'rock'
-                          ? { scale: [1, 0.3], opacity: [1, 0] }
-                        : rockSmashesScissors && defenderType === 'rock'
-                          ? { scale: [1, 2], y: [0, -15, 20] }
-                        : rockSmashesScissors && defenderType === 'scissors'
-                          ? { scale: [1, 0.6, 0], opacity: [1, 0.3, 0] }
-                        : scissorsCutsPaper && defenderType === 'scissors'
-                          ? { rotate: [0, -35, 35, -30, 30, 0], scale: [1, 1.3] }
-                        : scissorsCutsPaper && defenderType === 'paper'
-                          ? { scale: [1, 0.6, 0], opacity: [1, 0.3, 0] }
+                      : defenderVariant
+                        ? defenderVariant
                         : defenderWins
                           ? { scale: [1, 1.5, 1.2] }
                           : { scale: [1, 0.5], opacity: [1, 0] }
                   : {}
               }
-              transition={{ duration: 0.65 }}
+              transition={phase === 'impact' && defenderVariant ? {} : { duration: 0.6 }}
             >
               {defenderEmoji}
             </motion.span>
