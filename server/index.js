@@ -268,6 +268,7 @@ function startSetupPhase(room) {
     }
   }, 1000);
 
+  const playersPayload = room.players.map((p) => ({ id: p.id, name: p.name, side: p.side }));
   room.players.forEach((p) => {
     if (!p.socketId) return;
     const gridForPlayer = room.setupGrid.map((row) =>
@@ -275,6 +276,8 @@ function startSetupPhase(room) {
     );
     io.to(p.socketId).emit('setup_start', {
       phase: 'SETUP',
+      roomId: room.roomId,
+      players: playersPayload,
       grid: gridForPlayer,
       setupReady: room.setupReady,
     });
@@ -462,7 +465,13 @@ io.on('connection', (socket) => {
       });
       if (room.phase === 'SETUP') {
         const gridForPlayer = room.setupGrid?.map((row) => row.map((c) => (c && c.owner === pid ? { ...c } : null))) ?? createEmptyGrid();
-        socket.emit('setup_start', { phase: 'SETUP', grid: gridForPlayer, setupReady: room.setupReady ?? {} });
+        socket.emit('setup_start', {
+          phase: 'SETUP',
+          roomId: rid,
+          players: room.players.map((x) => ({ id: x.id, name: x.name, side: x.side })),
+          grid: gridForPlayer,
+          setupReady: room.setupReady ?? {},
+        });
         const remaining = Math.max(0, Math.ceil((room.setupTimerEnd - Date.now()) / 1000));
         socket.emit('setup_timer', { remaining });
       } else if (room.phase === 'PLAYING' && room.gameState) {
@@ -522,6 +531,8 @@ io.on('connection', (socket) => {
         : createEmptyGrid();
       socket.emit('setup_start', {
         phase: 'SETUP',
+        roomId: room.roomId,
+        players: room.players.map((x) => ({ id: x.id, name: x.name, side: x.side })),
         grid: gridForPlayer,
         setupReady: room.setupReady ?? {},
       });

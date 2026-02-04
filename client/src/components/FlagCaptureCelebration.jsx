@@ -52,7 +52,7 @@ export default function FlagCaptureCelebration({ won, onComplete, rematchRequest
   if (won) {
     return (
       <motion.div
-        className="absolute inset-0 z-30 flex flex-col items-center justify-center rounded-lg overflow-hidden"
+        className="absolute inset-0 z-30 flex flex-col items-center justify-center rounded-lg overflow-hidden touch-manipulation"
         style={{ backdropFilter: 'blur(8px)', backgroundColor: 'rgba(0,0,0,0.4)' }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -62,7 +62,7 @@ export default function FlagCaptureCelebration({ won, onComplete, rematchRequest
           {showVideo ? (
             <motion.div
               key="video"
-              className="flex items-center justify-center w-full max-w-md aspect-video"
+              className="flex items-center justify-center w-full max-w-md aspect-video pointer-events-none"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -119,7 +119,7 @@ export default function FlagCaptureCelebration({ won, onComplete, rematchRequest
             type="button"
             onClick={requestRematch}
             disabled={iRequested}
-            className="mt-6 w-full px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-amber-600 disabled:cursor-default text-white font-medium transition-colors"
+            className="mt-6 w-full min-h-[48px] px-4 py-3 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-amber-600 disabled:cursor-default text-white font-medium transition-colors touch-manipulation active:scale-[0.98]"
           >
             {bothReady ? 'Starting rematch...' : iRequested ? 'Waiting for opponent...' : 'Rematch'}
           </button>
@@ -132,7 +132,7 @@ export default function FlagCaptureCelebration({ won, onComplete, rematchRequest
 
   return (
     <motion.div
-      className="absolute inset-0 z-30 flex items-center justify-center rounded-lg overflow-hidden"
+      className="absolute inset-0 z-30 flex items-center justify-center rounded-lg overflow-hidden touch-manipulation"
       style={{ backdropFilter: 'blur(8px)', backgroundColor: 'rgba(0,0,0,0.5)' }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -153,7 +153,7 @@ export default function FlagCaptureCelebration({ won, onComplete, rematchRequest
           type="button"
           onClick={requestRematch}
           disabled={iRequested}
-          className="mt-6 w-full px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-amber-600 disabled:cursor-default text-white font-medium transition-colors"
+          className="mt-6 w-full min-h-[48px] px-4 py-3 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-amber-600 disabled:cursor-default text-white font-medium transition-colors touch-manipulation active:scale-[0.98]"
         >
           {bothReady ? 'Starting rematch...' : iRequested ? 'Waiting for opponent...' : 'Rematch'}
         </button>

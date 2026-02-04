@@ -50,7 +50,7 @@ function GameOverOverlay({ winner, rematchRequested, requestRematch, playerId })
           type="button"
           onClick={requestRematch}
           disabled={iRequested}
-          className="w-full px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-amber-600 disabled:cursor-default text-white font-medium transition-colors"
+          className="w-full min-h-[48px] px-4 py-3 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-amber-600 disabled:cursor-default text-white font-medium transition-colors touch-manipulation active:scale-[0.98]"
         >
           {bothReady ? 'Starting rematch...' : iRequested ? 'Waiting for opponent...' : 'Rematch'}
         </button>

@@ -83,7 +83,7 @@ export function GameProvider({ children }) {
       setPlayers(pl);
     });
 
-    s.on('setup_start', ({ grid, setupReady: sr }) => {
+    s.on('setup_start', ({ grid, setupReady: sr, roomId: rid, players: pl }) => {
       setPhase('SETUP');
       setSetupPhase(true);
       setSetupGrid(grid);
@@ -91,6 +91,8 @@ export function GameProvider({ children }) {
       setGameState(null);
       setGameOver(null);
       setRematchRequested({});
+      if (rid) setRoomId(rid);
+      if (pl && Array.isArray(pl)) setPlayers(pl);
     });
 
     s.on('setup_update', ({ grid, setupReady: sr }) => {
@@ -176,6 +178,16 @@ export function GameProvider({ children }) {
     const interval = setInterval(poll, 1000);
     return () => clearInterval(interval);
   }, [socket, players.length, gameState, setupPhase]);
+
+  useEffect(() => {
+    if (!socket || !gameOver) return;
+    const hasRequested = rematchRequested?.[playerId];
+    if (!hasRequested) return;
+
+    const poll = () => socket.emit('request_game_state');
+    const interval = setInterval(poll, 1500);
+    return () => clearInterval(interval);
+  }, [socket, gameOver, rematchRequested, playerId]);
 
   const joinRoom = (rid, playerName) => {
     const roomIdToUse = (rid || '').trim() || crypto.randomUUID().slice(0, 8);
