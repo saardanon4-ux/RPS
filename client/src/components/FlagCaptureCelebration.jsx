@@ -59,10 +59,10 @@ export default function FlagCaptureCelebration({ won, onComplete }) {
           {showVideo ? (
             <motion.div
               key="video"
-              className="flex items-center justify-center w-24 h-24 sm:w-28 sm:h-28 overflow-hidden rounded-full"
-              initial={{ opacity: 0, scale: 0.8 }}
+              className="flex items-center justify-center w-full max-w-md aspect-video"
+              initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
+              exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.3 }}
             >
               <video
@@ -71,8 +71,7 @@ export default function FlagCaptureCelebration({ won, onComplete }) {
                 muted
                 loop={false}
                 playsInline
-                className="min-w-full min-h-full object-cover object-center"
-                style={{ width: '200%', height: '200%', marginLeft: '-50%', marginTop: '-50%' }}
+                className="w-full h-full object-contain"
               />
             </motion.div>
           ) : (

@@ -129,26 +129,28 @@ export default function Board() {
 
   return (
     <div className="relative flex flex-col items-center gap-4">
-      <div className="w-full max-w-md space-y-1">
-        <p className="text-sm font-medium">
-          {myTurn ? (
-            <span className="text-green-600 dark:text-green-400">🟢 Your Turn</span>
-          ) : (
-            <span className="text-red-600 dark:text-red-400">🔴 Opponent Turn</span>
+      {!gameOver && (
+        <div className="w-full max-w-md space-y-1">
+          <p className="text-sm font-medium">
+            {myTurn ? (
+              <span className="text-green-600 dark:text-green-400">🟢 Your Turn</span>
+            ) : (
+              <span className="text-red-600 dark:text-red-400">🔴 Opponent Turn</span>
+            )}
+          </p>
+          {myTurn && turnStartTime && (
+            <div className="h-1.5 bg-stone-300 dark:bg-stone-600 rounded-full overflow-hidden">
+              <div
+                className="h-full transition-all duration-500 rounded-full"
+                style={{
+                  width: `${(turnRemaining / 30) * 100}%`,
+                  background: turnRemaining > 10 ? '#22c55e' : turnRemaining > 5 ? '#eab308' : '#ef4444',
+                }}
+              />
+            </div>
           )}
-        </p>
-        {myTurn && turnStartTime && (
-          <div className="h-1.5 bg-stone-300 dark:bg-stone-600 rounded-full overflow-hidden">
-            <div
-              className="h-full transition-all duration-500 rounded-full"
-              style={{
-                width: `${(turnRemaining / 30) * 100}%`,
-                background: turnRemaining > 10 ? '#22c55e' : turnRemaining > 5 ? '#eab308' : '#ef4444',
-              }}
-            />
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className={`relative w-[95vw] max-w-lg aspect-square flex flex-col rounded-lg overflow-hidden shadow-lg border-2 border-stone-300 dark:border-stone-600 ${tieBreakerState ? 'pointer-events-none' : ''}`}>
         <CombatModal combatState={combatState} playerId={playerId} onComplete={clearCombatAndApplyState} />
