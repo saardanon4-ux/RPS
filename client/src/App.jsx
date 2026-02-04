@@ -6,7 +6,7 @@ import { useGame } from './context/GameContext';
 export default function App() {
   const { connected, setupPhase, setupTimer } = useGame();
 
-  const totalSec = 30;
+  const totalSec = 40;
   const progress = setupTimer !== null ? (setupTimer / totalSec) * 100 : 100;
 
   return (

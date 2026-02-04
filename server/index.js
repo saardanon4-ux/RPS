@@ -29,7 +29,7 @@ const GRID_SIZE = 6;
 const RPS_BEATS = { rock: 'scissors', scissors: 'paper', paper: 'rock' };
 const RPS_TYPES = ['rock', 'paper', 'scissors'];
 const IMMOBILE_TYPES = ['flag', 'trap'];
-const SETUP_DURATION_SEC = 30;
+const SETUP_DURATION_SEC = 40;
 const TIE_BREAKER_DURATION_MS = 7000;
 const TURN_TIMEOUT_SEC = 30;
 

@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import confetti from 'canvas-confetti';
 import { useGame } from '../context/GameContext';
 import CombatModal from './CombatModal';
 import TieBreakerModal from './TieBreakerModal';
@@ -25,7 +26,26 @@ function getUnitImagePath(unit) {
 const IMMOBILE_TYPES = ['flag', 'trap'];
 
 const TILE_BASE =
-  'flex-1 min-w-0 aspect-square flex items-center justify-center p-1 text-xl sm:text-2xl font-medium transition-colors cursor-pointer select-none';
+  'flex-1 min-w-0 aspect-square flex items-center justify-center p-1 text-xl sm:text-2xl font-medium transition-all duration-200 cursor-pointer select-none hover:brightness-110';
+
+function GameOverOverlay({ winner }) {
+  useEffect(() => {
+    if (winner) {
+      confetti({ particleCount: 80, spread: 100, origin: { y: 0.6 } });
+      setTimeout(() => confetti({ particleCount: 50, spread: 70, origin: { x: 0.3, y: 0.5 } }), 200);
+      setTimeout(() => confetti({ particleCount: 50, spread: 70, origin: { x: 0.7, y: 0.5 } }), 400);
+    }
+  }, [winner]);
+  return (
+    <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10 rounded-lg">
+      <div className="bg-white dark:bg-stone-800 p-6 rounded-xl shadow-xl text-center max-w-xs">
+        <p className="text-xl font-bold">
+          {winner ? '🏆 You Win!' : '😔 You Lose'}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function getAdjacentKeys(row, col) {
   const keys = new Set();
@@ -140,13 +160,7 @@ export default function Board() {
           />
         )}
         {gameOver && !gameOver.flagCapture && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10 rounded-lg">
-            <div className="bg-white dark:bg-stone-800 p-6 rounded-xl shadow-xl text-center max-w-xs">
-              <p className="text-xl font-bold">
-                {gameOver.winnerId === playerId ? '🏆 You Win!' : '😔 You Lose'}
-              </p>
-            </div>
-          </div>
+          <GameOverOverlay winner={gameOver.winnerId === playerId} />
         )}
         {Array.from({ length: GRID_SIZE }, (_, row) => (
           <div key={row} className="flex flex-1 min-h-0">
@@ -180,7 +194,7 @@ export default function Board() {
               };
 
               return (
-                <div
+                <motion.div
                   key={key}
                   role="button"
                   tabIndex={0}
@@ -191,6 +205,8 @@ export default function Board() {
                   className={`${TILE_BASE} border border-green-800/50 ${bgClass} relative ${isRevealed ? 'ring-1 ring-sky-400/70 ring-inset' : ''}`}
                   data-row={row}
                   data-col={col}
+                  whileHover={{ scale: 1.02 }}
+                  transition={{ duration: 0.15 }}
                 >
                   {isRevealed && (
                     <span className="absolute top-0 right-0 text-[8px] sm:text-[10px] leading-none bg-sky-500/80 text-white rounded-bl px-0.5" title="Revealed to enemy">👁</span>
@@ -210,10 +226,20 @@ export default function Board() {
                         }}
                       />
                     ) : (
-                      <img {...imgProps} />
+                      <motion.img
+                        {...imgProps}
+                        initial={{ scale: 0.9, opacity: 0.8 }}
+                        animate={{
+                          scale: [1, 1.04, 1],
+                          opacity: 1,
+                        }}
+                        transition={{
+                          scale: { duration: 2.2, repeat: Infinity, ease: 'easeInOut' },
+                        }}
+                      />
                     )
                   )}
-                </div>
+                </motion.div>
               );
             })}
           </div>
