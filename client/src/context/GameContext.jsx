@@ -125,6 +125,16 @@ export function GameProvider({ children }) {
       setTieBreakerState({ deadline, unitType, isRestart: false });
     });
 
+    s.on('tie_break_tie', ({ combatResult, attackerId, newGameState }) => {
+      setCombatState({
+        attackerType: combatResult.attackerType,
+        defenderType: combatResult.defenderType,
+        result: combatResult.result,
+        attackerId,
+      });
+      setPendingGameState(newGameState ?? null);
+    });
+
     s.on('tie_break_restart', ({ deadline, timeout }) => {
       setTieBreakerState((prev) => ({ ...prev, deadline, isRestart: true, wasTimeout: !!timeout }));
     });
@@ -139,6 +149,7 @@ export function GameProvider({ children }) {
       });
       setPendingGameState(newGameState ?? null);
     });
+
 
     s.on('game_over', ({ winnerId, flagCapture }) => {
       setGameOver({ winnerId, flagCapture: !!flagCapture });

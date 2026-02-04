@@ -13,6 +13,7 @@ const COMBAT_DURATION_MS = 2800;
 
 function getResultLabel(result, attackerId, playerId) {
   if (result === 'both_destroyed') return 'DRAW';
+  if (result === 'trap_kills') return attackerId === playerId ? 'STUCK!' : 'TRAPPED!';
   const iWon = result === 'attacker_wins' ? attackerId === playerId : attackerId !== playerId;
   return iWon ? 'WIN!' : 'LOSE';
 }
@@ -137,7 +138,7 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          Combat!
+          {isTrap ? 'Caught in a trap!' : 'Combat!'}
         </motion.p>
 
         <div className="flex items-center gap-4 relative min-h-[140px] w-[280px] justify-center">
@@ -165,7 +166,7 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
               animate={
                 phase === 'impact'
                   ? isTrap
-                    ? { scale: [1, 1.2, 0], opacity: [1, 1, 0] }
+                    ? { scale: [1, 0.8, 0.6], y: [0, 5, 10], opacity: [1, 0.8, 0] }
                     : bothDestroyed
                       ? { scale: [1, 1.4, 0], opacity: [1, 0.8, 0] }
                       : paperWrapsRock && attackerType === 'paper'
@@ -219,14 +220,45 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
             }
           >
             {isTrap && phase === 'impact' && (
-              <motion.span
-                className="absolute text-6xl text-emerald-500/90 -top-2"
-                initial={{ scale: 0.3, opacity: 0 }}
-                animate={{ scale: 1.2, opacity: 0.9 }}
-                transition={{ duration: 0.4 }}
+              <motion.div
+                className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
               >
-                🌿
-              </motion.span>
+                <motion.span
+                  className="absolute text-5xl text-emerald-600 -top-4 -left-2"
+                  initial={{ scale: 0.2, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 0.95 }}
+                  transition={{ duration: 0.35 }}
+                >
+                  🌿
+                </motion.span>
+                <motion.span
+                  className="absolute text-5xl text-emerald-600 -top-4 -right-2"
+                  initial={{ scale: 0.2, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 0.95 }}
+                  transition={{ duration: 0.35, delay: 0.05 }}
+                >
+                  🌿
+                </motion.span>
+                <motion.span
+                  className="absolute text-5xl text-emerald-600 -bottom-2 left-0"
+                  initial={{ scale: 0.2, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 0.95 }}
+                  transition={{ duration: 0.35, delay: 0.1 }}
+                >
+                  🌿
+                </motion.span>
+                <motion.span
+                  className="absolute text-5xl text-emerald-600 -bottom-2 right-0"
+                  initial={{ scale: 0.2, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 0.95 }}
+                  transition={{ duration: 0.35, delay: 0.15 }}
+                >
+                  🌿
+                </motion.span>
+              </motion.div>
             )}
             <motion.span
               className="block text-5xl sm:text-6xl relative"
@@ -273,7 +305,10 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
             style={{
               color:
-                resultLabel === 'WIN!' ? '#22c55e' : resultLabel === 'LOSE' ? '#ef4444' : '#f59e0b',
+                resultLabel === 'WIN!' ? '#22c55e'
+                  : resultLabel === 'LOSE' ? '#ef4444'
+                  : resultLabel === 'STUCK!' || resultLabel === 'TRAPPED!' ? '#10b981'
+                  : '#f59e0b',
             }}
           >
             {resultLabel}

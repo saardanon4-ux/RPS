@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useGame } from '../context/GameContext';
 import CombatModal from './CombatModal';
 import TieBreakerModal from './TieBreakerModal';
+import FlagCaptureCelebration from './FlagCaptureCelebration';
 
 const GRID_SIZE = 6;
 
@@ -91,39 +92,58 @@ export default function Board() {
     );
   }
 
-  const { grid, currentTurn } = gameState;
+  const { grid, currentTurn, turnStartTime } = gameState;
   const myTurn = currentTurn === playerId;
+
+  const [turnRemaining, setTurnRemaining] = useState(30);
+  useEffect(() => {
+    if (!turnStartTime || !myTurn) return;
+    const tick = () => {
+      const elapsed = (Date.now() - turnStartTime) / 1000;
+      setTurnRemaining(Math.max(0, 30 - elapsed));
+    };
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [turnStartTime, myTurn, gameState]);
 
   return (
     <div className="relative flex flex-col items-center gap-4">
-      <p className="text-sm font-medium">
-        {myTurn ? (
-          <span className="text-green-600 dark:text-green-400">🟢 Your Turn</span>
-        ) : (
-          <span className="text-red-600 dark:text-red-400">🔴 Opponent Turn</span>
+      <div className="w-full max-w-md space-y-1">
+        <p className="text-sm font-medium">
+          {myTurn ? (
+            <span className="text-green-600 dark:text-green-400">🟢 Your Turn</span>
+          ) : (
+            <span className="text-red-600 dark:text-red-400">🔴 Opponent Turn</span>
+          )}
+        </p>
+        {myTurn && turnStartTime && (
+          <div className="h-1.5 bg-stone-300 dark:bg-stone-600 rounded-full overflow-hidden">
+            <div
+              className="h-full transition-all duration-500 rounded-full"
+              style={{
+                width: `${(turnRemaining / 30) * 100}%`,
+                background: turnRemaining > 10 ? '#22c55e' : turnRemaining > 5 ? '#eab308' : '#ef4444',
+              }}
+            />
+          </div>
         )}
-      </p>
+      </div>
 
       <div className={`relative w-[95vw] max-w-lg aspect-square flex flex-col rounded-lg overflow-hidden shadow-lg border-2 border-stone-300 dark:border-stone-600 ${tieBreakerState ? 'pointer-events-none' : ''}`}>
         <CombatModal combatState={combatState} playerId={playerId} onComplete={clearCombatAndApplyState} />
         <TieBreakerModal tieBreakerState={tieBreakerState} onSubmitChoice={submitTieChoice} />
-        {gameOver && (
+        {gameOver?.flagCapture && (
+          <FlagCaptureCelebration
+            won={gameOver.winnerId === playerId}
+            onComplete={() => {}}
+          />
+        )}
+        {gameOver && !gameOver.flagCapture && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10 rounded-lg">
             <div className="bg-white dark:bg-stone-800 p-6 rounded-xl shadow-xl text-center max-w-xs">
               <p className="text-xl font-bold">
-                {gameOver.winnerId === playerId ? (
-                  gameOver.flagCapture ? (
-                    <>🚩 You captured the flag!<br />🏆 You Win!</>
-                  ) : (
-                    '🏆 You Win!'
-                  )
-                ) : (
-                  gameOver.flagCapture ? (
-                    <>😔 Your flag was captured.<br />You Lose</>
-                  ) : (
-                    '😔 You Lose'
-                  )
-                )}
+                {gameOver.winnerId === playerId ? '🏆 You Win!' : '😔 You Lose'}
               </p>
             </div>
           </div>

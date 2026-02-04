@@ -30,7 +30,8 @@ const RPS_BEATS = { rock: 'scissors', scissors: 'paper', paper: 'rock' };
 const RPS_TYPES = ['rock', 'paper', 'scissors'];
 const IMMOBILE_TYPES = ['flag', 'trap'];
 const SETUP_DURATION_SEC = 30;
-const TIE_BREAKER_DURATION_MS = 3000;
+const TIE_BREAKER_DURATION_MS = 7000;
+const TURN_TIMEOUT_SEC = 30;
 
 function shuffle(arr) {
   const a = [...arr];
@@ -96,10 +97,11 @@ function countMobileUnits(grid, playerId) {
 }
 
 function emitGameState(room) {
+  const payload = { turnStartTime: room.turnStartTime };
   room.players.forEach((p) => {
     if (!p.socketId) return;
     const sanitized = sanitizeGameStateForPlayer(room.gameState, p.id);
-    io.to(p.socketId).emit('game_state_update', { gameState: sanitized });
+    io.to(p.socketId).emit('game_state_update', { gameState: { ...sanitized, ...payload } });
   });
 }
 
@@ -123,14 +125,27 @@ function resolveTieBreaker(room) {
   const choice2 = tb.choices[defenderOwnerId];
 
   if (choice1 === choice2) {
-    // Another tie - restart
-    tb.choices = {};
-    tb.deadline = Date.now() + TIE_BREAKER_DURATION_MS;
-    tb.timeoutId = setTimeout(() => resolveTieBreaker(room), TIE_BREAKER_DURATION_MS);
+    // Same choice - show combat (tie) then restart
+    const tieCombatResult = { attackerType: choice1, defenderType: choice2, result: 'both_destroyed' };
     room.players.forEach((p) => {
       if (!p.socketId) return;
-      io.to(p.socketId).emit('tie_break_restart', { deadline: tb.deadline });
+      const entry = sanitizeGameStateForPlayer(room.gameState, p.id);
+      io.to(p.socketId).emit('tie_break_tie', {
+        combatResult: tieCombatResult,
+        attackerId,
+        newGameState: entry,
+      });
     });
+    tb.choices = {};
+    tb.deadline = Date.now() + TIE_BREAKER_DURATION_MS;
+    tb.timeoutId = setTimeout(() => resolveTieBreaker(room), TIE_BREAKER_DURATION_MS + 3200);
+    setTimeout(() => {
+      if (!room.tieBreaker) return;
+      room.players.forEach((p) => {
+        if (!p.socketId) return;
+        io.to(p.socketId).emit('tie_break_restart', { deadline: tb.deadline });
+      });
+    }, 2800);
     return;
   }
 
@@ -258,6 +273,126 @@ function startSetupPhase(room) {
   });
 }
 
+function getValidMovesForPlayer(room, playerId) {
+  const grid = room.gameState.grid;
+  const moves = [];
+  for (let r = 0; r < GRID_SIZE; r++) {
+    for (let c = 0; c < GRID_SIZE; c++) {
+      const cell = grid[r]?.[c];
+      if (!cell || cell.owner !== playerId || IMMOBILE_TYPES.includes(cell.type)) continue;
+      const adj = getAdjacentCells(r, c);
+      for (const [tr, tc] of adj) {
+        const target = grid[tr]?.[tc];
+        if (!target) moves.push([r, c, tr, tc]);
+        else if (target.owner !== playerId) moves.push([r, c, tr, tc]);
+      }
+    }
+  }
+  return moves;
+}
+
+function executeMove(room, fromRow, fromCol, toRow, toCol, movingPlayerId) {
+  const gs = room.gameState;
+  const grid = gs.grid;
+  const fromCell = grid[fromRow]?.[fromCol];
+  const toCell = grid[toRow][toCol];
+  const isToEmpty = !toCell;
+  let gameOver = null;
+  let combatResult = null;
+
+  if (isToEmpty) {
+    grid[toRow][toCol] = { ...fromCell, revealed: fromCell.revealed ?? false };
+    grid[fromRow][fromCol] = null;
+  } else {
+    const defender = toCell;
+    if (defender.type === 'trap') {
+      grid[fromRow][fromCol] = null;
+      combatResult = { attackerType: fromCell.type, defenderType: 'trap', result: 'trap_kills' };
+    } else if (defender.type === 'flag') {
+      grid[toRow][toCol] = { ...fromCell, revealed: true };
+      grid[fromRow][fromCol] = null;
+      gameOver = movingPlayerId;
+      room.phase = 'GAME_OVER';
+    } else if (RPS_BEATS[fromCell.type] === defender.type) {
+      grid[toRow][toCol] = { ...fromCell, revealed: true };
+      grid[fromRow][fromCol] = null;
+      combatResult = { attackerType: fromCell.type, defenderType: defender.type, result: 'attacker_wins' };
+    } else if (fromCell.type === defender.type) {
+      room.phase = 'TIE_BREAKER';
+      const deadline = Date.now() + TIE_BREAKER_DURATION_MS;
+      room.tieBreaker = {
+        fromRow, fromCol, toRow, toCol,
+        attackerId: movingPlayerId, defenderOwnerId: defender.owner, unitType: fromCell.type,
+        deadline, choices: {},
+        timeoutId: setTimeout(() => resolveTieBreaker(room), TIE_BREAKER_DURATION_MS),
+      };
+      if (room.turnTimerInterval) {
+        clearInterval(room.turnTimerInterval);
+        room.turnTimerInterval = null;
+      }
+      room.players.forEach((p) => {
+        if (!p.socketId) return;
+        io.to(p.socketId).emit('tie_break_start', { deadline, unitType: fromCell.type });
+      });
+      return 'tie_breaker';
+    } else {
+      grid[fromRow][fromCol] = null;
+      grid[toRow][toCol] = { ...grid[toRow][toCol], revealed: true };
+      combatResult = { attackerType: fromCell.type, defenderType: defender.type, result: 'defender_wins' };
+    }
+  }
+
+  if (!gameOver) {
+    gs.currentTurn = room.players.find((p) => p.id !== movingPlayerId)?.id ?? gs.currentTurn;
+    room.turnStartTime = Date.now();
+    room.players.forEach((p) => {
+      const mobile = countMobileUnits(grid, p.id);
+      if (mobile === 0) gameOver = room.players.find((x) => x.id !== p.id)?.id ?? null;
+    });
+    if (gameOver) room.phase = 'GAME_OVER';
+  }
+
+  if (combatResult) {
+    room.players.forEach((p) => {
+      if (!p.socketId) return;
+      const entry = sanitizeGameStateForPlayer(room.gameState, p.id);
+      io.to(p.socketId).emit('combat_event', {
+        ...combatResult,
+        attackerId: movingPlayerId,
+        newGameState: { ...entry, turnStartTime: room.turnStartTime },
+      });
+    });
+  } else {
+    emitGameState(room);
+  }
+  if (gameOver) {
+    if (room.turnTimerInterval) {
+      clearInterval(room.turnTimerInterval);
+      room.turnTimerInterval = null;
+    }
+    room.players.forEach((p) => {
+      if (!p.socketId) return;
+      io.to(p.socketId).emit('game_over', { winnerId: gameOver, flagCapture: !combatResult });
+    });
+  }
+  return 'ok';
+}
+
+function checkTurnTimeout(room) {
+  if (room.phase !== 'PLAYING' || !room.gameState || room.tieBreaker) return;
+  const elapsed = (Date.now() - (room.turnStartTime || 0)) / 1000;
+  if (elapsed < TURN_TIMEOUT_SEC) return;
+  const moves = getValidMovesForPlayer(room, room.gameState.currentTurn);
+  if (moves.length === 0) {
+    room.gameState.currentTurn = room.players.find((p) => p.id !== room.gameState.currentTurn)?.id;
+    room.turnStartTime = Date.now();
+    emitGameState(room);
+    return;
+  }
+  const [fr, fc, tr, tc] = moves[Math.floor(Math.random() * moves.length)];
+  executeMove(room, fr, fc, tr, tc, room.gameState.currentTurn);
+}
+
 function transitionToPlaying(room) {
   if (room.setupInterval) {
     clearInterval(room.setupInterval);
@@ -265,10 +400,16 @@ function transitionToPlaying(room) {
   }
   room.phase = 'PLAYING';
   room.gameState = buildGameStateFromSetup(room);
+  room.turnStartTime = Date.now();
+  if (room.turnTimerInterval) clearInterval(room.turnTimerInterval);
+  room.turnTimerInterval = setInterval(() => {
+    const r = rooms.get(room.roomId);
+    if (r) checkTurnTimeout(r);
+  }, 1000);
   room.players.forEach((p) => {
     if (!p.socketId) return;
     const sanitized = sanitizeGameStateForPlayer(room.gameState, p.id);
-    io.to(p.socketId).emit('game_start', { gameState: sanitized, phase: 'PLAYING' });
+    io.to(p.socketId).emit('game_start', { gameState: { ...sanitized, turnStartTime: room.turnStartTime }, phase: 'PLAYING' });
   });
 }
 
@@ -315,7 +456,7 @@ io.on('connection', (socket) => {
         socket.emit('setup_timer', { remaining });
       } else if (room.phase === 'PLAYING' && room.gameState) {
         const sanitized = sanitizeGameStateForPlayer(room.gameState, pid);
-        socket.emit('game_start', { gameState: sanitized, phase: 'PLAYING' });
+        socket.emit('game_start', { gameState: { ...sanitized, turnStartTime: room.turnStartTime }, phase: 'PLAYING' });
       } else if (room.phase === 'TIE_BREAKER' && room.tieBreaker) {
         const sanitized = sanitizeGameStateForPlayer(room.gameState, pid);
         socket.emit('game_state_update', { gameState: sanitized });
@@ -377,12 +518,12 @@ io.on('connection', (socket) => {
 
     if (room.phase === 'PLAYING' && room.gameState) {
       const sanitized = sanitizeGameStateForPlayer(room.gameState, socket.playerId);
-      socket.emit('game_start', { gameState: sanitized, phase: 'PLAYING' });
+      socket.emit('game_start', { gameState: { ...sanitized, turnStartTime: room.turnStartTime }, phase: 'PLAYING' });
     }
 
     if (room.phase === 'TIE_BREAKER' && room.tieBreaker) {
       const sanitized = sanitizeGameStateForPlayer(room.gameState, socket.playerId);
-      socket.emit('game_state_update', { gameState: sanitized });
+      socket.emit('game_state_update', { gameState: { ...sanitized, turnStartTime: room.turnStartTime } });
       socket.emit('tie_break_start', {
         deadline: room.tieBreaker.deadline,
         unitType: room.tieBreaker.unitType || 'rock',
@@ -526,83 +667,7 @@ io.on('connection', (socket) => {
     const isToEnemy = toCell && toCell.owner !== socket.playerId;
     if (!isToEmpty && !isToEnemy) return;
 
-    let gameOver = null;
-    let combatResult = null;
-
-    if (isToEmpty) {
-      grid[toRow][toCol] = { ...fromCell, revealed: fromCell.revealed ?? false };
-      grid[fromRow][fromCol] = null;
-    } else {
-      const defender = toCell;
-      if (defender.type === 'trap') {
-        grid[fromRow][fromCol] = null;
-        combatResult = { attackerType: fromCell.type, defenderType: 'trap', result: 'trap_kills' };
-      } else if (defender.type === 'flag') {
-        grid[toRow][toCol] = { ...fromCell, revealed: true };
-        grid[fromRow][fromCol] = null;
-        gameOver = socket.playerId;
-        room.phase = 'GAME_OVER';
-        // No combat — flag capture is a simple takeover, not a fight
-      } else if (RPS_BEATS[fromCell.type] === defender.type) {
-        grid[toRow][toCol] = { ...fromCell, revealed: true };
-        grid[fromRow][fromCol] = null;
-        combatResult = { attackerType: fromCell.type, defenderType: defender.type, result: 'attacker_wins' };
-      } else if (fromCell.type === defender.type) {
-        // Sudden Death Tie-Breaker: don't destroy, start tie-breaker
-        room.phase = 'TIE_BREAKER';
-        const deadline = Date.now() + TIE_BREAKER_DURATION_MS;
-        room.tieBreaker = {
-          fromRow,
-          fromCol,
-          toRow,
-          toCol,
-          attackerId: socket.playerId,
-          defenderOwnerId: defender.owner,
-          unitType: fromCell.type,
-          deadline,
-          choices: {},
-          timeoutId: setTimeout(() => resolveTieBreaker(room), TIE_BREAKER_DURATION_MS),
-        };
-        room.players.forEach((p) => {
-          if (!p.socketId) return;
-          io.to(p.socketId).emit('tie_break_start', { deadline, unitType: fromCell.type });
-        });
-        return;
-      } else {
-        grid[fromRow][fromCol] = null;
-        grid[toRow][toCol] = { ...grid[toRow][toCol], revealed: true };
-        combatResult = { attackerType: fromCell.type, defenderType: defender.type, result: 'defender_wins' };
-      }
-    }
-
-    if (!gameOver) {
-      gs.currentTurn = room.players.find((p) => p.id !== socket.playerId)?.id ?? gs.currentTurn;
-
-      room.players.forEach((p) => {
-        const mobile = countMobileUnits(grid, p.id);
-        if (mobile === 0) {
-          gameOver = room.players.find((x) => x.id !== p.id)?.id ?? null;
-        }
-      });
-      if (gameOver) room.phase = 'GAME_OVER';
-    }
-
-    if (combatResult) {
-      room.players.forEach((p) => {
-        const entry = sanitizeGameStateForPlayer(room.gameState, p.id);
-        if (!p.socketId) return;
-        io.to(p.socketId).emit('combat_event', { ...combatResult, attackerId: socket.playerId, newGameState: entry });
-      });
-    } else {
-      emitGameState(room);
-    }
-
-    if (gameOver) {
-      room.players.forEach((p) => {
-        if (!p.socketId) return;
-        io.to(p.socketId).emit('game_over', { winnerId: gameOver, flagCapture: !combatResult });
-      });
-    }
+    executeMove(room, fromRow, fromCol, toRow, toCol, socket.playerId);
   });
 
   socket.on('submit_tie_choice', ({ choice }) => {
