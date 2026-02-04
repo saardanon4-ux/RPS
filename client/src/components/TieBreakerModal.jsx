@@ -71,29 +71,25 @@ export default function TieBreakerModal({ tieBreakerState, onSubmitChoice }) {
             >
               {wasTimeout ? "Time's up! Choose again" : 'TIE! TRY AGAIN!'}
             </motion.p>
-          ) : countdown !== null && countdown > 0 ? (
-            <motion.div
-              key="countdown"
-              className="text-6xl font-bold text-amber-400 tabular-nums"
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.5, opacity: 0 }}
-            >
-              {countdown}
-            </motion.div>
           ) : (
             <motion.div
               key="choices"
-              className="flex gap-4 justify-center flex-wrap"
+              className="flex flex-col items-center gap-4"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
+              {countdown !== null && countdown > 0 && (
+                <span className="text-2xl font-bold text-amber-400 tabular-nums">
+                  {countdown} sec
+                </span>
+              )}
+              <div className="flex gap-4 justify-center flex-wrap">
               {RPS_OPTIONS.map((opt) => (
                 <motion.button
                   key={opt.type}
                   type="button"
                   onClick={() => onSubmitChoice(opt.type)}
-                  className="flex flex-col items-center gap-2 p-3 rounded-xl bg-stone-800 hover:bg-stone-700 border-2 border-stone-600 hover:border-amber-500/60 transition-colors min-w-[80px]"
+                  className="flex flex-col items-center justify-center gap-2 p-4 min-h-[80px] min-w-[80px] rounded-xl bg-stone-800 hover:bg-stone-700 active:bg-stone-600 border-2 border-stone-600 hover:border-amber-500/60 transition-colors touch-manipulation"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.98 }}
                 >
@@ -105,6 +101,7 @@ export default function TieBreakerModal({ tieBreakerState, onSubmitChoice }) {
                   <span className="text-xs font-medium text-stone-300">{opt.label}</span>
                 </motion.button>
               ))}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

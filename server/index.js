@@ -97,8 +97,9 @@ function countMobileUnits(grid, playerId) {
 
 function emitGameState(room) {
   room.players.forEach((p) => {
+    if (!p.socketId) return;
     const sanitized = sanitizeGameStateForPlayer(room.gameState, p.id);
-    io.to(p.id).emit('game_state_update', { gameState: sanitized });
+    io.to(p.socketId).emit('game_state_update', { gameState: sanitized });
   });
 }
 
@@ -126,9 +127,10 @@ function resolveTieBreaker(room) {
     tb.choices = {};
     tb.deadline = Date.now() + TIE_BREAKER_DURATION_MS;
     tb.timeoutId = setTimeout(() => resolveTieBreaker(room), TIE_BREAKER_DURATION_MS);
-    room.players.forEach((p) =>
-      io.to(p.id).emit('tie_break_restart', { deadline: tb.deadline })
-    );
+    room.players.forEach((p) => {
+      if (!p.socketId) return;
+      io.to(p.socketId).emit('tie_break_restart', { deadline: tb.deadline });
+    });
     return;
   }
 
@@ -157,13 +159,15 @@ function resolveTieBreaker(room) {
   if (gameOver) room.phase = 'GAME_OVER';
 
   room.players.forEach((p) => {
+    if (!p.socketId) return;
     const entry = sanitizeGameStateForPlayer(room.gameState, p.id);
-    io.to(p.id).emit('tie_break_resolved', { combatResult, attackerId, newGameState: entry });
+    io.to(p.socketId).emit('tie_break_resolved', { combatResult, attackerId, newGameState: entry });
   });
   if (gameOver) {
-    room.players.forEach((p) =>
-      io.to(p.id).emit('game_over', { winnerId: gameOver, flagCapture: false })
-    );
+    room.players.forEach((p) => {
+      if (!p.socketId) return;
+      io.to(p.socketId).emit('game_over', { winnerId: gameOver, flagCapture: false });
+    });
   }
 }
 
@@ -242,10 +246,11 @@ function startSetupPhase(room) {
   }, 1000);
 
   room.players.forEach((p) => {
+    if (!p.socketId) return;
     const gridForPlayer = room.setupGrid.map((row) =>
       row.map((c) => (c && c.owner === p.id ? { ...c } : null))
     );
-    io.to(p.id).emit('setup_start', {
+    io.to(p.socketId).emit('setup_start', {
       phase: 'SETUP',
       grid: gridForPlayer,
       setupReady: room.setupReady,
@@ -261,8 +266,9 @@ function transitionToPlaying(room) {
   room.phase = 'PLAYING';
   room.gameState = buildGameStateFromSetup(room);
   room.players.forEach((p) => {
+    if (!p.socketId) return;
     const sanitized = sanitizeGameStateForPlayer(room.gameState, p.id);
-    io.to(p.id).emit('game_start', { gameState: sanitized, phase: 'PLAYING' });
+    io.to(p.socketId).emit('game_start', { gameState: sanitized, phase: 'PLAYING' });
   });
 }
 
@@ -271,12 +277,51 @@ const rooms = new Map();
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
-  socket.on('join_room', ({ roomId, playerName }) => {
+  socket.on('join_room', ({ roomId, playerName, persistentPlayerId }) => {
     const rid = roomId || `room-${Date.now()}`;
     let room = rooms.get(rid);
     if (!room) {
       room = { roomId: rid, players: [], phase: 'WAITING', setupInterval: null };
       rooms.set(rid, room);
+    }
+
+    const pid = persistentPlayerId || socket.id;
+    const existingPlayer = room.players.find((p) => p.id === pid);
+
+    if (existingPlayer) {
+      if (existingPlayer.socketId) {
+        socket.emit('room_full', { roomId: rid });
+        return;
+      }
+      existingPlayer.socketId = socket.id;
+      const player = existingPlayer;
+      socket.join(rid);
+      socket.roomId = rid;
+      socket.playerId = pid;
+
+      socket.emit('joined_room', {
+        roomId: rid,
+        playerId: pid,
+        player: { id: pid, name: player.name, side: player.side },
+        players: room.players.map((p) => ({ id: p.id, name: p.name, side: p.side })),
+      });
+      room.players.forEach((p) => {
+        if (p.socketId) io.to(p.socketId).emit('room_updated', { roomId: rid, players: room.players.map((x) => ({ id: x.id, name: x.name, side: x.side })) });
+      });
+      if (room.phase === 'SETUP') {
+        const gridForPlayer = room.setupGrid?.map((row) => row.map((c) => (c && c.owner === pid ? { ...c } : null))) ?? createEmptyGrid();
+        socket.emit('setup_start', { phase: 'SETUP', grid: gridForPlayer, setupReady: room.setupReady ?? {} });
+        const remaining = Math.max(0, Math.ceil((room.setupTimerEnd - Date.now()) / 1000));
+        socket.emit('setup_timer', { remaining });
+      } else if (room.phase === 'PLAYING' && room.gameState) {
+        const sanitized = sanitizeGameStateForPlayer(room.gameState, pid);
+        socket.emit('game_start', { gameState: sanitized, phase: 'PLAYING' });
+      } else if (room.phase === 'TIE_BREAKER' && room.tieBreaker) {
+        const sanitized = sanitizeGameStateForPlayer(room.gameState, pid);
+        socket.emit('game_state_update', { gameState: sanitized });
+        socket.emit('tie_break_start', { deadline: room.tieBreaker.deadline, unitType: room.tieBreaker.unitType || 'rock' });
+      }
+      return;
     }
 
     if (room.players.length >= 2) {
@@ -285,7 +330,8 @@ io.on('connection', (socket) => {
     }
 
     const player = {
-      id: socket.id,
+      id: pid,
+      socketId: socket.id,
       name: playerName || `Player ${room.players.length + 1}`,
       side: room.players.length === 0 ? 'bottom' : 'top',
     };
@@ -293,15 +339,17 @@ io.on('connection', (socket) => {
 
     socket.join(rid);
     socket.roomId = rid;
-    socket.playerId = socket.id;
+    socket.playerId = pid;
 
     socket.emit('joined_room', {
       roomId: rid,
-      playerId: socket.id,
-      player,
-      players: room.players,
+      playerId: pid,
+      player: { id: pid, name: player.name, side: player.side },
+      players: room.players.map((p) => ({ id: p.id, name: p.name, side: p.side })),
     });
-    io.to(rid).emit('room_updated', { roomId: rid, players: room.players });
+    room.players.forEach((p) => {
+      if (p.socketId) io.to(p.socketId).emit('room_updated', { roomId: rid, players: room.players.map((x) => ({ id: x.id, name: x.name, side: x.side })) });
+    });
 
     if (room.players.length === 2) {
       startSetupPhase(room);
@@ -315,7 +363,7 @@ io.on('connection', (socket) => {
 
     if (room.phase === 'SETUP') {
       const gridForPlayer = room.setupGrid
-        ? room.setupGrid.map((row) => row.map((c) => (c && c.owner === socket.id ? { ...c } : null)))
+        ? room.setupGrid.map((row) => row.map((c) => (c && c.owner === socket.playerId ? { ...c } : null)))
         : createEmptyGrid();
       socket.emit('setup_start', {
         phase: 'SETUP',
@@ -328,12 +376,12 @@ io.on('connection', (socket) => {
     }
 
     if (room.phase === 'PLAYING' && room.gameState) {
-      const sanitized = sanitizeGameStateForPlayer(room.gameState, socket.id);
+      const sanitized = sanitizeGameStateForPlayer(room.gameState, socket.playerId);
       socket.emit('game_start', { gameState: sanitized, phase: 'PLAYING' });
     }
 
     if (room.phase === 'TIE_BREAKER' && room.tieBreaker) {
-      const sanitized = sanitizeGameStateForPlayer(room.gameState, socket.id);
+      const sanitized = sanitizeGameStateForPlayer(room.gameState, socket.playerId);
       socket.emit('game_state_update', { gameState: sanitized });
       socket.emit('tie_break_start', {
         deadline: room.tieBreaker.deadline,
@@ -347,14 +395,14 @@ io.on('connection', (socket) => {
     const room = rooms.get(socket.roomId);
     if (!room || room.phase !== 'SETUP') return;
 
-    const player = room.players.find((p) => p.id === socket.id);
+    const player = room.players.find((p) => p.id === socket.playerId);
     if (!player) return;
 
     const slots = getPlayerSetupSlots(player.side);
     const isValidCell = slots.some(([r, c]) => r === row && c === col);
     if (!isValidCell || room.setupGrid[row][col]) return;
 
-    const placed = countPlacedForPlayer(room.setupGrid, socket.id, player.side);
+    const placed = countPlacedForPlayer(room.setupGrid, socket.playerId, player.side);
     const total = placed.rock + placed.paper + placed.scissors + placed.flag + placed.trap;
     if (total >= 12) return;
 
@@ -366,16 +414,17 @@ io.on('connection', (socket) => {
     room.setupGrid[row][col] = {
       type,
       id: `${player.side}-${type}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      owner: socket.id,
+      owner: socket.playerId,
       ownerSide: player.side,
       revealed: false,
     };
 
     room.players.forEach((p) => {
+      if (!p.socketId) return;
       const gridForPlayer = room.setupGrid.map((row) =>
         row.map((c) => (c && c.owner === p.id ? { ...c } : null))
       );
-      io.to(p.id).emit('setup_update', {
+      io.to(p.socketId).emit('setup_update', {
         grid: gridForPlayer,
         setupReady: room.setupReady,
       });
@@ -387,20 +436,21 @@ io.on('connection', (socket) => {
     const room = rooms.get(socket.roomId);
     if (!room || room.phase !== 'SETUP') return;
 
-    const player = room.players.find((p) => p.id === socket.id);
+    const player = room.players.find((p) => p.id === socket.playerId);
     if (!player) return;
 
     const slots = getPlayerSetupSlots(player.side);
     const isMyCell = slots.some(([r, c]) => r === row && c === col);
-    if (!isMyCell || !room.setupGrid[row][col] || room.setupGrid[row][col].owner !== socket.id) return;
+    if (!isMyCell || !room.setupGrid[row][col] || room.setupGrid[row][col].owner !== socket.playerId) return;
 
     room.setupGrid[row][col] = null;
 
     room.players.forEach((p) => {
+      if (!p.socketId) return;
       const gridForPlayer = room.setupGrid.map((row) =>
         row.map((c) => (c && c.owner === p.id ? { ...c } : null))
       );
-      io.to(p.id).emit('setup_update', {
+      io.to(p.socketId).emit('setup_update', {
         grid: gridForPlayer,
         setupReady: room.setupReady,
       });
@@ -412,13 +462,14 @@ io.on('connection', (socket) => {
     const room = rooms.get(socket.roomId);
     if (!room || room.phase !== 'SETUP') return;
 
-    smartFillEmptySlots(room, socket.id);
+    smartFillEmptySlots(room, socket.playerId);
 
     room.players.forEach((p) => {
+      if (!p.socketId) return;
       const gridForPlayer = room.setupGrid.map((row) =>
         row.map((c) => (c && c.owner === p.id ? { ...c } : null))
       );
-      io.to(p.id).emit('setup_update', {
+      io.to(p.socketId).emit('setup_update', {
         grid: gridForPlayer,
         setupReady: room.setupReady,
       });
@@ -430,18 +481,19 @@ io.on('connection', (socket) => {
     const room = rooms.get(socket.roomId);
     if (!room || room.phase !== 'SETUP') return;
 
-    const player = room.players.find((p) => p.id === socket.id);
+    const player = room.players.find((p) => p.id === socket.playerId);
     if (!player) return;
-    const placed = countPlacedForPlayer(room.setupGrid, socket.id, player.side);
+    const placed = countPlacedForPlayer(room.setupGrid, socket.playerId, player.side);
     const total = placed.rock + placed.paper + placed.scissors + placed.flag + placed.trap;
     if (total !== 12 || placed.flag !== 1 || placed.trap !== 1) return;
 
-    room.setupReady[socket.id] = true;
+    room.setupReady[socket.playerId] = true;
     room.players.forEach((p) => {
+      if (!p.socketId) return;
       const gridForPlayer = room.setupGrid.map((row) =>
         row.map((c) => (c && c.owner === p.id ? { ...c } : null))
       );
-      io.to(p.id).emit('setup_update', {
+      io.to(p.socketId).emit('setup_update', {
         grid: gridForPlayer,
         setupReady: room.setupReady,
       });
@@ -460,10 +512,10 @@ io.on('connection', (socket) => {
     const gs = room.gameState;
     const grid = gs.grid;
 
-    if (gs.currentTurn !== socket.id) return;
+    if (gs.currentTurn !== socket.playerId) return;
 
     const fromCell = grid[fromRow]?.[fromCol];
-    if (!fromCell || fromCell.owner !== socket.id) return;
+    if (!fromCell || fromCell.owner !== socket.playerId) return;
     if (IMMOBILE_TYPES.includes(fromCell.type)) return;
 
     const adj = getAdjacentCells(fromRow, fromCol);
@@ -471,7 +523,7 @@ io.on('connection', (socket) => {
 
     const toCell = grid[toRow][toCol];
     const isToEmpty = !toCell;
-    const isToEnemy = toCell && toCell.owner !== socket.id;
+    const isToEnemy = toCell && toCell.owner !== socket.playerId;
     if (!isToEmpty && !isToEnemy) return;
 
     let gameOver = null;
@@ -488,7 +540,7 @@ io.on('connection', (socket) => {
       } else if (defender.type === 'flag') {
         grid[toRow][toCol] = { ...fromCell, revealed: true };
         grid[fromRow][fromCol] = null;
-        gameOver = socket.id;
+        gameOver = socket.playerId;
         room.phase = 'GAME_OVER';
         // No combat — flag capture is a simple takeover, not a fight
       } else if (RPS_BEATS[fromCell.type] === defender.type) {
@@ -504,16 +556,17 @@ io.on('connection', (socket) => {
           fromCol,
           toRow,
           toCol,
-          attackerId: socket.id,
+          attackerId: socket.playerId,
           defenderOwnerId: defender.owner,
           unitType: fromCell.type,
           deadline,
           choices: {},
           timeoutId: setTimeout(() => resolveTieBreaker(room), TIE_BREAKER_DURATION_MS),
         };
-        room.players.forEach((p) =>
-          io.to(p.id).emit('tie_break_start', { deadline, unitType: fromCell.type })
-        );
+        room.players.forEach((p) => {
+          if (!p.socketId) return;
+          io.to(p.socketId).emit('tie_break_start', { deadline, unitType: fromCell.type });
+        });
         return;
       } else {
         grid[fromRow][fromCol] = null;
@@ -523,7 +576,7 @@ io.on('connection', (socket) => {
     }
 
     if (!gameOver) {
-      gs.currentTurn = room.players.find((p) => p.id !== socket.id)?.id ?? gs.currentTurn;
+      gs.currentTurn = room.players.find((p) => p.id !== socket.playerId)?.id ?? gs.currentTurn;
 
       room.players.forEach((p) => {
         const mobile = countMobileUnits(grid, p.id);
@@ -537,7 +590,8 @@ io.on('connection', (socket) => {
     if (combatResult) {
       room.players.forEach((p) => {
         const entry = sanitizeGameStateForPlayer(room.gameState, p.id);
-        io.to(p.id).emit('combat_event', { ...combatResult, attackerId: socket.id, newGameState: entry });
+        if (!p.socketId) return;
+        io.to(p.socketId).emit('combat_event', { ...combatResult, attackerId: socket.playerId, newGameState: entry });
       });
     } else {
       emitGameState(room);
@@ -545,7 +599,8 @@ io.on('connection', (socket) => {
 
     if (gameOver) {
       room.players.forEach((p) =>
-        io.to(p.id).emit('game_over', { winnerId: gameOver, flagCapture: !combatResult })
+        if (!p.socketId) return;
+        io.to(p.socketId).emit('game_over', { winnerId: gameOver, flagCapture: !combatResult })
       );
     }
   });
@@ -557,9 +612,9 @@ io.on('connection', (socket) => {
     if (!['rock', 'paper', 'scissors'].includes(choice)) return;
 
     const tb = room.tieBreaker;
-    if (socket.id !== tb.attackerId && socket.id !== tb.defenderOwnerId) return;
+    if (socket.playerId !== tb.attackerId && socket.playerId !== tb.defenderOwnerId) return;
 
-    tb.choices[socket.id] = choice;
+    tb.choices[socket.playerId] = choice;
     const bothSubmitted =
       tb.choices[tb.attackerId] != null && tb.choices[tb.defenderOwnerId] != null;
     if (bothSubmitted) resolveTieBreaker(room);
@@ -573,7 +628,7 @@ io.on('connection', (socket) => {
         if (room.tieBreaker?.timeoutId) clearTimeout(room.tieBreaker.timeoutId);
         room.players = room.players.filter((p) => p.id !== socket.playerId);
         if (room.players.length === 0) rooms.delete(socket.roomId);
-        else io.to(socket.roomId).emit('room_updated', { roomId: socket.roomId, players: room.players });
+        else io.to(socket.roomId).emit('room_updated', { roomId: socket.roomId, players: room.players.map((x) => ({ id: x.id, name: x.name, side: x.side })) });
       }
       socket.leave(socket.roomId);
       socket.roomId = null;
@@ -581,14 +636,16 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    if (socket.roomId) {
+    if (socket.roomId && socket.playerId) {
       const room = rooms.get(socket.roomId);
       if (room) {
-        if (room.setupInterval) clearInterval(room.setupInterval);
-        if (room.tieBreaker?.timeoutId) clearTimeout(room.tieBreaker.timeoutId);
-        room.players = room.players.filter((p) => p.id !== socket.playerId);
-        if (room.players.length === 0) rooms.delete(socket.roomId);
-        else io.to(socket.roomId).emit('room_updated', { roomId: socket.roomId, players: room.players });
+        const p = room.players.find((x) => x.id === socket.playerId);
+        if (p) {
+          p.socketId = null;
+          room.players.forEach((q) => {
+            if (q.socketId) io.to(q.socketId).emit('room_updated', { roomId: socket.roomId, players: room.players.map((x) => ({ id: x.id, name: x.name, side: x.side })) });
+          });
+        }
       }
     }
     console.log('Client disconnected:', socket.id);

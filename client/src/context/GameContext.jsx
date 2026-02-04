@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
 const GameContext = createContext(null);
@@ -24,19 +24,45 @@ export function GameProvider({ children }) {
   const [setupTimer, setSetupTimer] = useState(null);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState(null);
+  const stateRef = useRef({ roomId: '', player: null });
+  stateRef.current = { roomId, player };
 
   useEffect(() => {
     const s = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
     });
+
+    let reconnectRoomId = null;
+    let reconnectPlayerName = null;
 
     s.on('connect', () => {
       setConnected(true);
       setError(null);
+      if (reconnectRoomId) {
+        const rid = reconnectRoomId;
+        reconnectRoomId = null;
+        const persistentId =
+          (typeof localStorage !== 'undefined' && localStorage.getItem('rps_player_id')) ||
+          crypto.randomUUID();
+        if (typeof localStorage !== 'undefined') localStorage.setItem('rps_player_id', persistentId);
+        s.emit('join_room', {
+          roomId: rid,
+          playerName: reconnectPlayerName || undefined,
+          persistentPlayerId: persistentId,
+        });
+        reconnectPlayerName = null;
+      }
     });
 
     s.on('disconnect', () => {
       setConnected(false);
+      reconnectRoomId = stateRef.current.roomId;
+      reconnectPlayerName = stateRef.current.player?.name;
     });
 
     s.on('joined_room', ({ roomId: rid, playerId: pid, player: p, players: pl }) => {
@@ -137,7 +163,15 @@ export function GameProvider({ children }) {
     const roomIdToUse = (rid || '').trim() || crypto.randomUUID().slice(0, 8);
     if (!socket) return;
     setError(null);
-    socket.emit('join_room', { roomId: roomIdToUse, playerName: playerName || undefined });
+    const persistentId =
+      (typeof localStorage !== 'undefined' && localStorage.getItem('rps_player_id')) ||
+      crypto.randomUUID();
+    if (typeof localStorage !== 'undefined') localStorage.setItem('rps_player_id', persistentId);
+    socket.emit('join_room', {
+      roomId: roomIdToUse,
+      playerName: playerName || undefined,
+      persistentPlayerId: persistentId,
+    });
   };
 
   const leaveRoom = () => {
