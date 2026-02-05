@@ -73,6 +73,9 @@ export default function Board() {
     return keys;
   }, [combatState, tieBreakerState]);
 
+  const battleTargetKey = combatState ? `${combatState.toRow},${combatState.toCol}` : null;
+  const isDraw = combatState?.result === 'both_destroyed';
+
   const handleCellClick = (row, col) => {
     if (gameOver || tieBreakerState) return;
 
@@ -102,46 +105,11 @@ export default function Board() {
     );
   }
 
-  const { grid, currentTurn, turnStartTime } = gameState;
+  const { grid, currentTurn } = gameState;
   const myTurn = currentTurn === playerId;
-
-  const [turnRemaining, setTurnRemaining] = useState(30);
-  useEffect(() => {
-    if (!turnStartTime || !myTurn) return;
-    const tick = () => {
-      const elapsed = (Date.now() - turnStartTime) / 1000;
-      setTurnRemaining(Math.max(0, 30 - elapsed));
-    };
-    tick();
-    const id = setInterval(tick, 500);
-    return () => clearInterval(id);
-  }, [turnStartTime, myTurn, gameState]);
 
   return (
     <div className="relative flex flex-col items-center gap-4">
-      {!gameOver && (
-        <div className="w-full max-w-md space-y-1">
-          <p className="text-sm font-medium">
-            {myTurn ? (
-              <span className="text-amber-400">🟢 Your Turn</span>
-            ) : (
-              <span className="text-white/60">🔴 Opponent Turn</span>
-            )}
-          </p>
-          {myTurn && turnStartTime && (
-            <div className="h-1.5 bg-stone-300 dark:bg-stone-600 rounded-full overflow-hidden">
-              <div
-                className="h-full transition-all duration-500 rounded-full"
-                style={{
-                  width: `${(turnRemaining / 30) * 100}%`,
-                  background: turnRemaining > 10 ? '#22c55e' : turnRemaining > 5 ? '#eab308' : '#ef4444',
-                }}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
       <div
         className={`relative w-[95vw] max-w-lg aspect-square flex flex-col rounded-lg overflow-hidden shadow-lg border-2 border-stone-300 dark:border-stone-600 ${tieBreakerState ? 'pointer-events-none' : ''}`}
         style={isPlayer2 ? { transform: 'rotate(180deg)' } : undefined}
@@ -169,11 +137,14 @@ export default function Board() {
               const isSelected = selected?.row === row && selected?.col === col;
 
               const isCombatCell = combatCellKeys.has(key);
+              const isBattleTarget = key === battleTargetKey;
+              const isDrawSquare = isBattleTarget && isDraw;
               const isCheckeredLight = (row + col) % 2 === 0;
               let bgClass = isCheckeredLight ? 'bg-green-600' : 'bg-green-700';
               if (isValidMove) bgClass = 'bg-yellow-300 dark:bg-yellow-600/80';
               if (isSelected) bgClass += ' ring-2 ring-amber-500 ring-offset-1';
               if (isCombatCell) bgClass += ' ring-4 ring-red-500 ring-offset-1 animate-pulse';
+              if (isDrawSquare) bgClass += ' bg-stone-400 dark:bg-stone-500 animate-pulse';
 
               const isMyMobileUnit = isMyUnit && cell && !IMMOBILE_TYPES.includes(cell.type);
               const canMoveThisTurn = isMyMobileUnit && myTurn;
@@ -188,7 +159,9 @@ export default function Board() {
                 src: imagePath,
                 alt: cell?.type === 'hidden' ? 'Unknown unit' : cell?.type ?? 'Unit',
                 className: 'w-full h-full object-contain drop-shadow-lg',
-                style: isEnemyUnit ? { filter: 'hue-rotate(180deg) brightness(90%)' } : undefined,
+                style: isEnemyUnit
+                  ? { filter: 'hue-rotate(180deg) brightness(90%)', transform: !isPlayer2 ? 'rotate(180deg)' : undefined }
+                  : undefined,
               };
 
               return (
@@ -209,6 +182,25 @@ export default function Board() {
                 >
                   {isRevealed && (
                     <span className="absolute top-0 right-0 text-[8px] sm:text-[10px] leading-none bg-sky-500/80 text-white rounded-bl px-0.5" title="Revealed to enemy">👁</span>
+                  )}
+                  {isBattleTarget && combatState && (
+                    <span
+                      className="absolute inset-0 flex items-center justify-center pointer-events-none text-2xl opacity-90"
+                      style={isPlayer2 ? { transform: 'rotate(180deg)' } : undefined}
+                    >
+                      ⚔️
+                    </span>
+                  )}
+                  {isDrawSquare && (
+                    <motion.span
+                      className="absolute inset-0 flex items-center justify-center pointer-events-none text-lg font-bold text-white drop-shadow-lg z-10"
+                      style={isPlayer2 ? { transform: 'rotate(180deg)' } : undefined}
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: 'spring', stiffness: 300 }}
+                    >
+                      🤝 DRAW
+                    </motion.span>
                   )}
                   {imagePath && (
                     isHidden ? (

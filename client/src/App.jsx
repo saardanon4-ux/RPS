@@ -1,17 +1,31 @@
+import { useState, useEffect } from 'react';
 import Board from './components/Board';
 import WelcomeScreen from './components/WelcomeScreen';
-import PlayerBanner from './components/PlayerBanner';
+import GameHUD from './components/GameHUD';
 import SetupBoard from './components/SetupBoard';
 import { useGame } from './context/GameContext';
 
 export default function App() {
-  const { connected, setupPhase, setupTimer, roomId, player, players, gameState } = useGame();
+  const { setupPhase, setupTimer, roomId, player, players, gameState, gameOver } = useGame();
 
   const totalSec = 40;
   const progress = setupTimer !== null ? (setupTimer / totalSec) * 100 : 100;
   const inRoom = roomId && player;
-  const opponent = players.find((p) => p.id !== player?.id);
   const currentTurn = gameState?.currentTurn;
+  const myTurn = currentTurn === player?.id;
+
+  const [turnRemaining, setTurnRemaining] = useState(30);
+  const turnStartTime = gameState?.turnStartTime;
+  useEffect(() => {
+    if (!turnStartTime || !myTurn) return;
+    const tick = () => {
+      const elapsed = (Date.now() - turnStartTime) / 1000;
+      setTurnRemaining(Math.max(0, 30 - elapsed));
+    };
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [turnStartTime, myTurn, gameState]);
 
   if (!inRoom) {
     return <WelcomeScreen />;
@@ -45,38 +59,28 @@ export default function App() {
         </div>
       )}
 
-      <header className="flex items-center justify-between px-4 py-3 gap-4">
-        <h1 className="text-xl font-bold tracking-tight text-white/90 shrink-0" style={{ fontFamily: "'Orbitron', sans-serif" }}>
-          RPS STRATEGO
-        </h1>
-        <div className="flex-1 flex justify-end min-w-0">
-          <WelcomeScreen />
+      <header className="flex flex-col items-center gap-3 px-4 py-3">
+        <div className="flex items-center justify-between w-full">
+          <h1 className="text-xl font-bold tracking-tight text-white/90 shrink-0" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+            RPS STRATEGO
+          </h1>
+          <div className="flex-1 flex justify-end min-w-0">
+            <WelcomeScreen />
+          </div>
         </div>
+        {players.length === 2 && !setupPhase && (
+          <GameHUD
+            players={players}
+            currentTurn={currentTurn}
+            turnRemaining={gameOver ? null : turnRemaining}
+            gameOver={!!gameOver}
+            localPlayerId={player?.id}
+          />
+        )}
       </header>
 
       <div className="flex-1 flex flex-col relative min-h-0">
-        {players.length === 2 && (
-          <>
-            <div className="absolute top-2 left-0 right-0 z-10 flex justify-center px-4">
-              <PlayerBanner
-                nickname={opponent?.name}
-                isOpponent
-                isTheirTurn={!!currentTurn && currentTurn === opponent?.id}
-                position="top"
-              />
-            </div>
-            <div className="absolute bottom-2 left-0 right-0 z-10 flex justify-center px-4">
-              <PlayerBanner
-                nickname={player?.name}
-                isOpponent={false}
-                isTheirTurn={!!currentTurn && currentTurn === player?.id}
-                position="bottom"
-              />
-            </div>
-          </>
-        )}
-
-        <main className="flex-1 flex items-center justify-center p-4 pt-16 pb-16">
+        <main className="flex-1 flex items-center justify-center p-4">
           {setupPhase ? <SetupBoard /> : <Board />}
         </main>
       </div>
