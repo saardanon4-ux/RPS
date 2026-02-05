@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import confetti from 'canvas-confetti';
 import { useGame } from '../context/GameContext';
 import CombatModal from './CombatModal';
 import TieBreakerModal from './TieBreakerModal';
@@ -28,37 +27,6 @@ const IMMOBILE_TYPES = ['flag', 'trap'];
 const TILE_BASE =
   'flex-1 min-w-0 aspect-square flex items-center justify-center p-1 text-xl sm:text-2xl font-medium transition-all duration-200 cursor-pointer select-none hover:brightness-110';
 
-function GameOverOverlay({ winner, rematchRequested, requestRematch, playerId }) {
-  const iRequested = rematchRequested?.[playerId];
-  const otherRequested = Object.keys(rematchRequested ?? {}).some((id) => id !== playerId && rematchRequested[id]);
-  const bothReady = iRequested && otherRequested;
-
-  useEffect(() => {
-    if (winner) {
-      confetti({ particleCount: 80, spread: 100, origin: { y: 0.6 } });
-      setTimeout(() => confetti({ particleCount: 50, spread: 70, origin: { x: 0.3, y: 0.5 } }), 200);
-      setTimeout(() => confetti({ particleCount: 50, spread: 70, origin: { x: 0.7, y: 0.5 } }), 400);
-    }
-  }, [winner]);
-  return (
-    <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10 rounded-lg">
-      <div className="bg-white dark:bg-stone-800 p-6 rounded-xl shadow-xl text-center max-w-xs space-y-4">
-        <p className="text-xl font-bold">
-          {winner ? '🏆 You Win!' : '😔 You Lose'}
-        </p>
-        <button
-          type="button"
-          onClick={requestRematch}
-          disabled={iRequested}
-          className="w-full min-h-[48px] px-4 py-3 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-amber-600 disabled:cursor-default text-white font-medium transition-colors touch-manipulation active:scale-[0.98]"
-        >
-          {bothReady ? 'Starting rematch...' : iRequested ? 'Waiting for opponent...' : 'Rematch'}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function getAdjacentKeys(row, col) {
   const keys = new Set();
   if (row > 0) keys.add(`${row - 1},${col}`);
@@ -69,7 +37,8 @@ function getAdjacentKeys(row, col) {
 }
 
 export default function Board() {
-  const { gameState, playerId, gameOver, combatState, clearCombatAndApplyState, tieBreakerState, submitTieChoice, rematchRequested, requestRematch, makeMove } = useGame();
+  const { gameState, playerId, player, gameOver, combatState, clearCombatAndApplyState, tieBreakerState, submitTieChoice, rematchRequested, requestRematch, makeMove } = useGame();
+  const isPlayer2 = player?.side === 'top';
   const [selected, setSelected] = useState(null); // { row, col }
 
   const hasValidGame = gameState && Array.isArray(gameState.grid) && gameState.grid.length > 0;
@@ -95,6 +64,15 @@ export default function Board() {
     return valid;
   }, [selected, gameState?.grid, playerId, isMyTurn]);
 
+  const combatCellKeys = useMemo(() => {
+    const src = combatState || tieBreakerState;
+    if (!src || src.fromRow == null) return new Set();
+    const keys = new Set();
+    keys.add(`${src.fromRow},${src.fromCol}`);
+    keys.add(`${src.toRow},${src.toCol}`);
+    return keys;
+  }, [combatState, tieBreakerState]);
+
   const handleCellClick = (row, col) => {
     if (gameOver || tieBreakerState) return;
 
@@ -116,8 +94,8 @@ export default function Board() {
 
   if (!hasValidGame) {
     return (
-      <div className="inline-flex flex-col rounded-lg overflow-hidden shadow-lg border border-stone-200 dark:border-stone-700 p-4 bg-stone-50 dark:bg-stone-800/50">
-        <p className="text-sm text-stone-500 dark:text-stone-400">
+      <div className="inline-flex flex-col rounded-2xl overflow-hidden shadow-lg border border-white/10 p-6 bg-white/5 backdrop-blur-xl">
+        <p className="text-sm text-white/70">
           Waiting for opponent to join...
         </p>
       </div>
@@ -145,9 +123,9 @@ export default function Board() {
         <div className="w-full max-w-md space-y-1">
           <p className="text-sm font-medium">
             {myTurn ? (
-              <span className="text-green-600 dark:text-green-400">🟢 Your Turn</span>
+              <span className="text-amber-400">🟢 Your Turn</span>
             ) : (
-              <span className="text-red-600 dark:text-red-400">🔴 Opponent Turn</span>
+              <span className="text-white/60">🔴 Opponent Turn</span>
             )}
           </p>
           {myTurn && turnStartTime && (
@@ -164,24 +142,20 @@ export default function Board() {
         </div>
       )}
 
-      <div className={`relative w-[95vw] max-w-lg aspect-square flex flex-col rounded-lg overflow-hidden shadow-lg border-2 border-stone-300 dark:border-stone-600 ${tieBreakerState ? 'pointer-events-none' : ''}`}>
+      <div
+        className={`relative w-[95vw] max-w-lg aspect-square flex flex-col rounded-lg overflow-hidden shadow-lg border-2 border-stone-300 dark:border-stone-600 ${tieBreakerState ? 'pointer-events-none' : ''}`}
+        style={isPlayer2 ? { transform: 'rotate(180deg)' } : undefined}
+      >
         <CombatModal combatState={combatState} playerId={playerId} onComplete={clearCombatAndApplyState} />
         <TieBreakerModal tieBreakerState={tieBreakerState} onSubmitChoice={submitTieChoice} />
-        {gameOver?.flagCapture && (
+        {gameOver && (
           <FlagCaptureCelebration
             won={gameOver.winnerId === playerId}
+            winType={gameOver.flagCapture ? 'flag' : 'no_units'}
             rematchRequested={rematchRequested}
             requestRematch={requestRematch}
             playerId={playerId}
             onComplete={() => {}}
-          />
-        )}
-        {gameOver && !gameOver.flagCapture && (
-          <GameOverOverlay
-            winner={gameOver.winnerId === playerId}
-            rematchRequested={rematchRequested}
-            requestRematch={requestRematch}
-            playerId={playerId}
           />
         )}
         {Array.from({ length: GRID_SIZE }, (_, row) => (
@@ -194,10 +168,12 @@ export default function Board() {
               const isValidMove = validMoves.has(key);
               const isSelected = selected?.row === row && selected?.col === col;
 
+              const isCombatCell = combatCellKeys.has(key);
               const isCheckeredLight = (row + col) % 2 === 0;
               let bgClass = isCheckeredLight ? 'bg-green-600' : 'bg-green-700';
               if (isValidMove) bgClass = 'bg-yellow-300 dark:bg-yellow-600/80';
               if (isSelected) bgClass += ' ring-2 ring-amber-500 ring-offset-1';
+              if (isCombatCell) bgClass += ' ring-4 ring-red-500 ring-offset-1 animate-pulse';
 
               const isMyMobileUnit = isMyUnit && cell && !IMMOBILE_TYPES.includes(cell.type);
               const canMoveThisTurn = isMyMobileUnit && myTurn;
@@ -225,6 +201,7 @@ export default function Board() {
                     if (e.key === 'Enter' || e.key === ' ') handleCellClick(row, col);
                   }}
                   className={`${TILE_BASE} border border-green-800/50 ${bgClass} relative ${isRevealed ? 'ring-1 ring-sky-400/70 ring-inset' : ''}`}
+                  style={isPlayer2 ? { transform: 'rotate(180deg)' } : undefined}
                   data-row={row}
                   data-col={col}
                   whileHover={{ scale: 1.02 }}

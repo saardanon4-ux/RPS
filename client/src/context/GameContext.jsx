@@ -120,36 +120,38 @@ export function GameProvider({ children }) {
       setGameState(gs);
     });
 
-    s.on('combat_event', ({ attackerType, defenderType, result, attackerId, newGameState }) => {
-      setCombatState({ attackerType, defenderType, result, attackerId });
+    s.on('combat_event', ({ attackerType, defenderType, result, attackerId, fromRow, fromCol, toRow, toCol, newGameState }) => {
+      setCombatState({ attackerType, defenderType, result, attackerId, fromRow, fromCol, toRow, toCol });
       setPendingGameState(newGameState ?? null);
     });
 
-    s.on('tie_break_start', ({ deadline, unitType }) => {
-      setTieBreakerState({ deadline, unitType, isRestart: false });
+    s.on('tie_break_start', ({ deadline, unitType, fromRow, fromCol, toRow, toCol }) => {
+      setTieBreakerState({ deadline, unitType, isRestart: false, fromRow, fromCol, toRow, toCol });
     });
 
-    s.on('tie_break_tie', ({ combatResult, attackerId, newGameState }) => {
+    s.on('tie_break_tie', ({ combatResult, attackerId, fromRow, fromCol, toRow, toCol, newGameState }) => {
       setCombatState({
         attackerType: combatResult.attackerType,
         defenderType: combatResult.defenderType,
         result: combatResult.result,
         attackerId,
+        fromRow, fromCol, toRow, toCol,
       });
       setPendingGameState(newGameState ?? null);
     });
 
-    s.on('tie_break_restart', ({ deadline, timeout }) => {
-      setTieBreakerState((prev) => ({ ...prev, deadline, isRestart: true, wasTimeout: !!timeout }));
+    s.on('tie_break_restart', ({ deadline, timeout, fromRow, fromCol, toRow, toCol }) => {
+      setTieBreakerState((prev) => ({ ...prev, deadline, isRestart: true, wasTimeout: !!timeout, fromRow, fromCol, toRow, toCol }));
     });
 
-    s.on('tie_break_resolved', ({ combatResult, attackerId, newGameState }) => {
+    s.on('tie_break_resolved', ({ combatResult, attackerId, fromRow, fromCol, toRow, toCol, newGameState }) => {
       setTieBreakerState(null);
       setCombatState({
         attackerType: combatResult.attackerType,
         defenderType: combatResult.defenderType,
         result: combatResult.result,
         attackerId,
+        fromRow, fromCol, toRow, toCol,
       });
       setPendingGameState(newGameState ?? null);
     });

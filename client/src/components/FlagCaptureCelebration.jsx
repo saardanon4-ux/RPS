@@ -4,19 +4,29 @@ import confetti from 'canvas-confetti';
 
 const VIDEO_DURATION_MS = 4000;
 
-export default function FlagCaptureCelebration({ won, onComplete, rematchRequested, requestRematch, playerId }) {
+const WIN_LABELS = {
+  flag: { title: 'FLAG CAPTURED!', sub: '🏆 YOU WIN! 🏆', icon: '🚩' },
+  no_units: { title: 'VICTORY!', sub: '🏆 YOU WIN! 🏆', icon: '🏆' },
+};
+const LOSE_LABELS = {
+  flag: { title: 'Your flag was captured', sub: '😔 You Lose', icon: '🚩' },
+  no_units: { title: 'All your units were destroyed', sub: '😔 You Lose', icon: '💥' },
+};
+
+export default function FlagCaptureCelebration({ won, winType = 'flag', onComplete, rematchRequested, requestRematch, playerId }) {
   const iRequested = rematchRequested?.[playerId];
   const otherRequested = Object.keys(rematchRequested ?? {}).some((id) => id !== playerId && rematchRequested[id]);
   const bothReady = iRequested && otherRequested;
-  const [showVideo, setShowVideo] = useState(won);
+  const [showVideo, setShowVideo] = useState(won && winType === 'flag');
 
   useEffect(() => {
-    if (won) {
+    if (won && winType === 'flag') {
       setShowVideo(true);
       const t = setTimeout(() => setShowVideo(false), VIDEO_DURATION_MS);
       return () => clearTimeout(t);
     }
-  }, [won]);
+    if (won && winType === 'no_units') setShowVideo(false);
+  }, [won, winType]);
 
   useEffect(() => {
     if (won) {
@@ -59,7 +69,7 @@ export default function FlagCaptureCelebration({ won, onComplete, rematchRequest
         exit={{ opacity: 0 }}
       >
         <AnimatePresence mode="wait">
-          {showVideo ? (
+          {showVideo && winType === 'flag' ? (
             <motion.div
               key="video"
               className="flex items-center justify-center w-full max-w-md aspect-video pointer-events-none"
@@ -91,14 +101,14 @@ export default function FlagCaptureCelebration({ won, onComplete, rematchRequest
             transition={{ duration: 0.5, repeat: 2, repeatDelay: 0.2 }}
             className="text-7xl sm:text-8xl mb-4"
           >
-            🚩
+            {WIN_LABELS[winType]?.icon ?? WIN_LABELS.flag.icon}
           </motion.div>
           <motion.p
             className="text-3xl sm:text-4xl font-black text-amber-400 uppercase tracking-widest drop-shadow-lg"
             animate={{ scale: [1, 1.05, 1] }}
             transition={{ duration: 0.4, repeat: Infinity, repeatDelay: 0.6 }}
           >
-            FLAG CAPTURED!
+            {WIN_LABELS[winType]?.title ?? WIN_LABELS.flag.title}
           </motion.p>
           <motion.p
             className="text-4xl sm:text-5xl font-black text-green-400 mt-4"
@@ -106,7 +116,7 @@ export default function FlagCaptureCelebration({ won, onComplete, rematchRequest
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.4 }}
           >
-            🏆 YOU WIN! 🏆
+            {WIN_LABELS[winType]?.sub ?? WIN_LABELS.flag.sub}
           </motion.p>
           <motion.div
             className="flex justify-center gap-4 mt-6 text-4xl"
@@ -145,10 +155,10 @@ export default function FlagCaptureCelebration({ won, onComplete, rematchRequest
         transition={{ type: 'spring', stiffness: 150 }}
       >
         <motion.p className="text-5xl mb-4" animate={{ y: [0, -5, 0] }} transition={{ duration: 1, repeat: Infinity }}>
-          🚩
+          {LOSE_LABELS[winType]?.icon ?? LOSE_LABELS.flag.icon}
         </motion.p>
-        <p className="text-xl font-bold text-stone-400">Your flag was captured</p>
-        <p className="text-2xl font-black text-red-500 mt-2">😔 You Lose</p>
+        <p className="text-xl font-bold text-stone-400">{LOSE_LABELS[winType]?.title ?? LOSE_LABELS.flag.title}</p>
+        <p className="text-2xl font-black text-red-500 mt-2">{LOSE_LABELS[winType]?.sub ?? LOSE_LABELS.flag.sub}</p>
         <button
           type="button"
           onClick={requestRematch}

@@ -1,16 +1,24 @@
 import Board from './components/Board';
-import Lobby from './components/Lobby';
+import WelcomeScreen from './components/WelcomeScreen';
+import PlayerBanner from './components/PlayerBanner';
 import SetupBoard from './components/SetupBoard';
 import { useGame } from './context/GameContext';
 
 export default function App() {
-  const { connected, setupPhase, setupTimer } = useGame();
+  const { connected, setupPhase, setupTimer, roomId, player, players, gameState } = useGame();
 
   const totalSec = 40;
   const progress = setupTimer !== null ? (setupTimer / totalSec) * 100 : 100;
+  const inRoom = roomId && player;
+  const opponent = players.find((p) => p.id !== player?.id);
+  const currentTurn = gameState?.currentTurn;
+
+  if (!inRoom) {
+    return <WelcomeScreen />;
+  }
 
   return (
-    <div className="min-h-screen bg-stone-100 dark:bg-stone-900 text-stone-900 dark:text-stone-100 flex flex-col items-center p-4">
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-indigo-950/50 to-slate-900 text-white flex flex-col">
       {setupPhase && (
         <div className="fixed top-0 left-0 right-0 z-30">
           <div className="h-2 bg-stone-800/80 shadow-inner">
@@ -36,19 +44,42 @@ export default function App() {
           </div>
         </div>
       )}
-      <header className="text-center mb-6 mt-4">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-stone-800 dark:text-stone-100">
-          RPS Stratego
+
+      <header className="flex items-center justify-between px-4 py-3 gap-4">
+        <h1 className="text-xl font-bold tracking-tight text-white/90 shrink-0" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+          RPS STRATEGO
         </h1>
-        <p className="text-sm text-stone-600 dark:text-stone-400 mt-1">
-          {connected ? 'Connected' : 'Connecting...'}
-        </p>
+        <div className="flex-1 flex justify-end min-w-0">
+          <WelcomeScreen />
+        </div>
       </header>
 
-      <main className="flex flex-col items-center gap-8">
-        <Lobby />
-        {setupPhase ? <SetupBoard /> : <Board />}
-      </main>
+      <div className="flex-1 flex flex-col relative min-h-0">
+        {players.length === 2 && (
+          <>
+            <div className="absolute top-2 left-0 right-0 z-10 flex justify-center px-4">
+              <PlayerBanner
+                nickname={opponent?.name}
+                isOpponent
+                isTheirTurn={!!currentTurn && currentTurn === opponent?.id}
+                position="top"
+              />
+            </div>
+            <div className="absolute bottom-2 left-0 right-0 z-10 flex justify-center px-4">
+              <PlayerBanner
+                nickname={player?.name}
+                isOpponent={false}
+                isTheirTurn={!!currentTurn && currentTurn === player?.id}
+                position="bottom"
+              />
+            </div>
+          </>
+        )}
+
+        <main className="flex-1 flex items-center justify-center p-4 pt-16 pb-16">
+          {setupPhase ? <SetupBoard /> : <Board />}
+        </main>
+      </div>
     </div>
   );
 }

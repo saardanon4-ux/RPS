@@ -133,6 +133,7 @@ function resolveTieBreaker(room) {
       io.to(p.socketId).emit('tie_break_tie', {
         combatResult: tieCombatResult,
         attackerId,
+        fromRow: tb.fromRow, fromCol: tb.fromCol, toRow: tb.toRow, toCol: tb.toCol,
         newGameState: entry,
       });
     });
@@ -143,7 +144,10 @@ function resolveTieBreaker(room) {
       if (!room.tieBreaker) return;
       room.players.forEach((p) => {
         if (!p.socketId) return;
-        io.to(p.socketId).emit('tie_break_restart', { deadline: tb.deadline });
+        io.to(p.socketId).emit('tie_break_restart', {
+          deadline: tb.deadline,
+          fromRow: tb.fromRow, fromCol: tb.fromCol, toRow: tb.toRow, toCol: tb.toCol,
+        });
       });
     }, 2800);
     return;
@@ -176,7 +180,11 @@ function resolveTieBreaker(room) {
   room.players.forEach((p) => {
     if (!p.socketId) return;
     const entry = sanitizeGameStateForPlayer(room.gameState, p.id);
-    io.to(p.socketId).emit('tie_break_resolved', { combatResult, attackerId, newGameState: entry });
+    io.to(p.socketId).emit('tie_break_resolved', {
+      combatResult, attackerId,
+      fromRow: tb.fromRow, fromCol: tb.fromCol, toRow: tb.toRow, toCol: tb.toCol,
+      newGameState: entry,
+    });
   });
   if (gameOver) {
     room.rematchRequested = {};
@@ -203,26 +211,28 @@ function smartFillEmptySlots(room, playerId) {
   const player = room.players.find((p) => p.id === playerId);
   if (!player) return;
   const slots = getPlayerSetupSlots(player.side);
-  const emptySlots = slots.filter(([r, c]) => !room.setupGrid[r][c]);
+  const emptySlots = slots.filter(([r, c]) => !room.setupGrid[r]?.[c]);
+  const totalEmpty = emptySlots.length;
+  if (totalEmpty === 0) return;
   const placed = countPlacedForPlayer(room.setupGrid, playerId, player.side);
-  const needFlag = 1 - placed.flag;
-  const needTrap = 1 - placed.trap;
-  const needRPS = 10 - placed.rock - placed.paper - placed.scissors;
+  const needFlag = Math.max(0, 1 - placed.flag);
+  const needTrap = Math.max(0, 1 - placed.trap);
+  const needRPS = Math.max(0, 10 - placed.rock - placed.paper - placed.scissors);
   const toPlace = [];
   for (let i = 0; i < needFlag; i++) toPlace.push('flag');
   for (let i = 0; i < needTrap; i++) toPlace.push('trap');
-  const rpsCount = Math.max(0, Math.min(needRPS, emptySlots.length - toPlace.length));
-  const rockCount = Math.ceil(rpsCount / 3);
-  const paperCount = Math.ceil((rpsCount - rockCount) / 2);
-  const scissorsCount = rpsCount - rockCount - paperCount;
+  let rpsToAdd = totalEmpty - toPlace.length;
+  rpsToAdd = Math.max(0, Math.min(rpsToAdd, needRPS));
+  const rockCount = Math.ceil(rpsToAdd / 3);
+  const paperCount = Math.ceil((rpsToAdd - rockCount) / 2);
+  const scissorsCount = rpsToAdd - rockCount - paperCount;
   for (let i = 0; i < rockCount; i++) toPlace.push('rock');
   for (let i = 0; i < paperCount; i++) toPlace.push('paper');
   for (let i = 0; i < scissorsCount; i++) toPlace.push('scissors');
   shuffle(toPlace);
-  let idx = 0;
-  emptySlots.forEach(([r, c]) => {
-    if (idx >= toPlace.length) return;
-    const type = toPlace[idx++];
+  for (let i = 0; i < totalEmpty && i < toPlace.length; i++) {
+    const [r, c] = emptySlots[i];
+    const type = toPlace[i];
     room.setupGrid[r][c] = {
       type,
       id: `${player.side}-${type}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -230,7 +240,7 @@ function smartFillEmptySlots(room, playerId) {
       ownerSide: player.side,
       revealed: false,
     };
-  });
+  }
 }
 
 function startSetupPhase(room) {
@@ -343,7 +353,7 @@ function executeMove(room, fromRow, fromCol, toRow, toCol, movingPlayerId) {
       }
       room.players.forEach((p) => {
         if (!p.socketId) return;
-        io.to(p.socketId).emit('tie_break_start', { deadline, unitType: fromCell.type });
+        io.to(p.socketId).emit('tie_break_start', { deadline, unitType: fromCell.type, fromRow, fromCol, toRow, toCol });
       });
       return 'tie_breaker';
     } else {
@@ -370,6 +380,7 @@ function executeMove(room, fromRow, fromCol, toRow, toCol, movingPlayerId) {
       io.to(p.socketId).emit('combat_event', {
         ...combatResult,
         attackerId: movingPlayerId,
+        fromRow, fromCol, toRow, toCol,
         newGameState: { ...entry, turnStartTime: room.turnStartTime },
       });
     });
@@ -480,7 +491,12 @@ io.on('connection', (socket) => {
       } else if (room.phase === 'TIE_BREAKER' && room.tieBreaker) {
         const sanitized = sanitizeGameStateForPlayer(room.gameState, pid);
         socket.emit('game_state_update', { gameState: sanitized });
-        socket.emit('tie_break_start', { deadline: room.tieBreaker.deadline, unitType: room.tieBreaker.unitType || 'rock' });
+        socket.emit('tie_break_start', {
+          deadline: room.tieBreaker.deadline,
+          unitType: room.tieBreaker.unitType || 'rock',
+          fromRow: room.tieBreaker.fromRow, fromCol: room.tieBreaker.fromCol,
+          toRow: room.tieBreaker.toRow, toCol: room.tieBreaker.toCol,
+        });
       } else if (room.phase === 'GAME_OVER' && room.lastWinnerId != null) {
         socket.emit('game_over', { winnerId: room.lastWinnerId, flagCapture: !!room.lastFlagCapture });
         socket.emit('rematch_update', { rematchRequested: room.rematchRequested ?? {} });
@@ -552,6 +568,8 @@ io.on('connection', (socket) => {
       socket.emit('tie_break_start', {
         deadline: room.tieBreaker.deadline,
         unitType: room.tieBreaker.unitType || 'rock',
+        fromRow: room.tieBreaker.fromRow, fromCol: room.tieBreaker.fromCol,
+        toRow: room.tieBreaker.toRow, toCol: room.tieBreaker.toCol,
       });
     }
   });

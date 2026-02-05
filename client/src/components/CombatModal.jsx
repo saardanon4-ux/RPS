@@ -11,8 +11,12 @@ const UNIT_EMOJI = {
 
 const COMBAT_DURATION_MS = 2800;
 
-function getResultLabel(result, attackerId, playerId) {
-  if (result === 'both_destroyed') return 'DRAW';
+function getResultLabel(result, attackerId, playerId, attackerType, defenderType) {
+  if (result === 'both_destroyed') {
+    const type = attackerType || defenderType;
+    const label = type ? `${UNIT_EMOJI[type] ?? type} vs ${UNIT_EMOJI[type] ?? type}` : '';
+    return label ? `${label} — DRAW!` : 'DRAW!';
+  }
   if (result === 'trap_kills') return attackerId === playerId ? 'STUCK!' : 'TRAPPED!';
   const iWon = result === 'attacker_wins' ? attackerId === playerId : attackerId !== playerId;
   return iWon ? 'WIN!' : 'LOSE';
@@ -176,7 +180,7 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
   const bothDestroyed = result === 'both_destroyed';
   const isTrap = result === 'trap_kills';
 
-  const resultLabel = getResultLabel(result, combatState.attackerId, playerId);
+  const resultLabel = getResultLabel(result, combatState.attackerId, playerId, attackerType, defenderType);
 
   const winnerType = attackerWins ? attackerType : defenderType;
   const loserType = attackerWins ? defenderType : attackerType;

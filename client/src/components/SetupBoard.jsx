@@ -98,12 +98,15 @@ export default function SetupBoard() {
 
   return (
     <div className="flex flex-col items-center gap-4 w-full max-w-lg">
-      <p className="text-sm text-stone-500">
+      <p className="text-sm text-white/70">
         {setupTimer !== null ? `${setupTimer}s left` : 'Setup'}
       </p>
 
       {/* Grid with slot styling */}
-      <div className="relative inline-flex flex-col rounded-lg overflow-hidden shadow-inner border-2 border-stone-400 dark:border-stone-600 bg-stone-200/50 dark:bg-stone-800/50 p-1">
+      <div
+        className="relative inline-flex flex-col rounded-lg overflow-hidden shadow-inner border-2 border-stone-400 dark:border-stone-600 bg-stone-200/50 dark:bg-stone-800/50 p-1"
+        style={player?.side === 'top' ? { transform: 'rotate(180deg)' } : undefined}
+      >
         {Array.from({ length: GRID_SIZE }, (_, row) => (
           <div key={row} className="flex">
             {Array.from({ length: GRID_SIZE }, (_, col) => {
@@ -133,6 +136,7 @@ export default function SetupBoard() {
                     if (e.key === 'Enter' || e.key === ' ') handleCellClick(row, col);
                   }}
                   className={`${TILE_BASE} rounded-sm ${bgClass}`}
+                  style={player?.side === 'top' ? { transform: 'rotate(180deg)' } : undefined}
                 >
                   {display}
                 </div>
@@ -144,7 +148,7 @@ export default function SetupBoard() {
 
       {/* Unit Palette */}
       <div className="w-full">
-        <p className="text-sm text-stone-600 dark:text-stone-400 mb-2 text-center">
+        <p className="text-sm text-white/60 mb-2 text-center">
           Select type, then click a slot. Click placed unit to remove.
         </p>
         <div className="flex flex-wrap gap-2 justify-center">
@@ -173,7 +177,7 @@ export default function SetupBoard() {
                 }`}
               >
                 <span className="text-2xl">{emoji}</span>
-                <span className="text-xs text-stone-600 dark:text-stone-400">
+                <span className="text-xs text-white/60">
                   {label}
                   {limit !== null ? ` (${count}/${limit})` : ` (${count})`}
                 </span>
@@ -202,7 +206,7 @@ export default function SetupBoard() {
       </div>
 
       {setupReady && Object.keys(setupReady).length > 0 && (
-        <p className="text-sm text-stone-500">
+        <p className="text-sm text-white/70">
           Ready: {Object.entries(setupReady).filter(([, r]) => r).length}/2
         </p>
       )}
