@@ -160,7 +160,7 @@ export default function Board() {
                 alt: cell?.type === 'hidden' ? 'Unknown unit' : cell?.type ?? 'Unit',
                 className: 'w-full h-full object-contain drop-shadow-lg',
                 style: isEnemyUnit
-                  ? { filter: 'hue-rotate(180deg) brightness(90%)', transform: !isPlayer2 ? 'rotate(180deg)' : undefined }
+                  ? { filter: 'hue-rotate(180deg) brightness(90%)' }
                   : undefined,
               };
 
