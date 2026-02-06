@@ -1,0 +1,22 @@
+{
+  "name": "RPS Stratego",
+  "short_name": "RPS Stratego",
+  "start_url": "/",
+  "display": "standalone",
+  "description": "Real-time RPS Stratego battle with friends.",
+  "theme_color": "#020617",
+  "background_color": "#020617",
+  "icons": [
+    {
+      "src": "/assets/unit-flag.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/unit-flag.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
+
