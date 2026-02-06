@@ -1,5 +1,6 @@
 # Build stage - React client
 FROM node:20-alpine AS client-builder
+RUN apk add --no-cache openssl compat-openssl1.1
 WORKDIR /app/client
 COPY client/package*.json ./
 RUN npm ci
@@ -8,6 +9,7 @@ RUN npm run build
 
 # Production stage - Node server + static client
 FROM node:20-alpine
+RUN apk add --no-cache openssl compat-openssl1.1
 WORKDIR /app
 
 # Install server dependencies
