@@ -1,6 +1,6 @@
 {
-  "name": "RPS Stratego",
-  "short_name": "RPS Stratego",
+  "name": "אחסן, נייר ומספריים",
+  "short_name": "אחסן, נייר ומספריים",
   "start_url": "/",
   "display": "standalone",
   "description": "Real-time RPS Stratego battle with friends.",

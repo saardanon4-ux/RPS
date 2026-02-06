@@ -38,7 +38,7 @@ export default function WelcomeScreen() {
   }
 
   return (
-    <div className="min-h-screen w-full fixed inset-0 flex items-center justify-center p-4 overflow-hidden">
+    <div className="min-h-screen w-full flex items-center justify-center p-4 overflow-hidden relative">
       {/* Animated gradient background */}
       <div
         className="absolute inset-0 -z-10"
@@ -85,7 +85,7 @@ export default function WelcomeScreen() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
           >
-            Rock • Paper • Scissors
+            אחסן, נייר ומספריים
           </motion.p>
 
           <form onSubmit={handleJoin} className="space-y-5">
