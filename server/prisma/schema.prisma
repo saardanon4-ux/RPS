@@ -20,7 +20,6 @@ model Group {
   color       String @default("#000000")
   totalWins   Int    @default(0)
   totalLosses Int    @default(0)
-  totalDraws  Int    @default(0)
   users       User[]
 }
 
@@ -30,7 +29,6 @@ model User {
   password       String
   wins           Int     @default(0)
   losses         Int     @default(0)
-  draws          Int     @default(0)
   groupId        Int?
   group          Group?  @relation(fields: [groupId], references: [id])
   gamesAsPlayerA Game[] @relation("gamesAsPlayerA")

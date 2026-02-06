@@ -5,12 +5,12 @@ import confetti from 'canvas-confetti';
 const VIDEO_DURATION_MS = 4000;
 
 const WIN_LABELS = {
-  flag: { title: 'FLAG CAPTURED!', sub: '🏆 YOU WIN! 🏆', icon: '🚩' },
-  no_units: { title: 'VICTORY!', sub: '🏆 YOU WIN! 🏆', icon: '🏆' },
+  flag: { title: 'דגל היריב נכבש!', sub: '🏆 ניצחון! 🏆', icon: '🚩' },
+  no_units: { title: 'כל יחידות היריב הושמדו', sub: '🏆 ניצחון! 🏆', icon: '🏆' },
 };
 const LOSE_LABELS = {
-  flag: { title: 'Your flag was captured', sub: '😔 You Lose', icon: '🚩' },
-  no_units: { title: 'All your units were destroyed', sub: '😔 You Lose', icon: '💥' },
+  flag: { title: 'הדגל שלך נכבש', sub: '😔 הפסד', icon: '🚩' },
+  no_units: { title: 'כל היחידות שלך הושמדו', sub: '😔 הפסד', icon: '💥' },
 };
 
 function wrapForPlayer2(content, isPlayer2) {
@@ -159,7 +159,7 @@ export default function FlagCaptureCelebration({ won, winType = 'flag', onComple
               disabled={iRequested}
               className="mt-6 w-full min-h-[48px] px-4 py-3 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-amber-600 disabled:cursor-default text-white font-medium transition-colors touch-manipulation active:scale-[0.98]"
             >
-              {bothReady ? 'Starting rematch...' : iRequested ? 'Waiting for opponent...' : 'Rematch'}
+                {bothReady ? 'פותח משחק חוזר...' : iRequested ? 'מחכה לאישור היריב...' : 'משחק חוזר'}
             </button>
           )}
             </motion.div>
@@ -196,7 +196,7 @@ export default function FlagCaptureCelebration({ won, winType = 'flag', onComple
             disabled={iRequested}
             className="mt-6 w-full min-h-[48px] px-4 py-3 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-amber-600 disabled:cursor-default text-white font-medium transition-colors touch-manipulation active:scale-[0.98]"
           >
-            {bothReady ? 'Starting rematch...' : iRequested ? 'Waiting for opponent...' : 'Rematch'}
+            {bothReady ? 'פותח משחק חוזר...' : iRequested ? 'מחכה לאישור היריב...' : 'משחק חוזר'}
           </button>
         )}
       </motion.div>

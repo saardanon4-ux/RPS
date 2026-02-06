@@ -13,6 +13,29 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Force consistent dark background and visible text on autofilled inputs */
+input,
+textarea {
+  background-color: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgba(248, 250, 252, 0.6);
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus {
+  -webkit-text-fill-color: #e5e7eb;
+  -webkit-box-shadow: 0 0 0px 1000px rgba(15, 23, 42, 0.95) inset;
+  transition: background-color 9999s ease-out 0s;
+}
+
 /* Combat modal — Rock wins: pop + smash down */
 @keyframes rock-smash {
   0% { transform: scale(1); }

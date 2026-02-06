@@ -8,21 +8,20 @@ export async function getUserStats(userId) {
     throw new Error('Invalid user id');
   }
 
-  const [asA, asB, winsAsWinner] = await Promise.all([
+  const [asA, asB, winsAsWinner, draws] = await Promise.all([
     prisma.game.count({ where: { playerAId: uid } }),
     prisma.game.count({ where: { playerBId: uid } }),
     prisma.game.count({ where: { winnerId: uid } }),
+    prisma.game.count({
+      where: {
+        OR: [{ playerAId: uid }, { playerBId: uid }],
+        winnerId: null,
+      },
+    }),
   ]);
 
   const totalGames = asA + asB;
   const wins = winsAsWinner;
-  const draws = await prisma.game.count({
-    where: {
-      OR: [{ playerAId: uid }, { playerBId: uid }],
-      winnerId: null,
-    },
-  });
-
   const losses = totalGames - wins - draws;
   const winRate = totalGames > 0 ? Number(((wins / totalGames) * 100).toFixed(2)) : 0;
 
@@ -103,5 +102,77 @@ export async function getHeadToHead(player1Id, player2Id) {
     losses,
     draws,
   };
+}
+
+export async function getHeadToHeadSummaryForUser(userId) {
+  const uid = Number(userId);
+  if (!uid || Number.isNaN(uid)) {
+    throw new Error('Invalid user id');
+  }
+
+  const games = await prisma.game.findMany({
+    where: {
+      OR: [{ playerAId: uid }, { playerBId: uid }],
+    },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      playerA: { select: { id: true, username: true, group: { select: { name: true, color: true } } } },
+      playerB: { select: { id: true, username: true, group: { select: { name: true, color: true } } } },
+    },
+  });
+
+  const byOpponent = new Map();
+
+  for (const g of games) {
+    const isA = g.playerAId === uid;
+    const opponent = isA ? g.playerB : g.playerA;
+    if (!opponent) continue;
+    const oppId = opponent.id;
+    if (!oppId) continue;
+
+    let entry = byOpponent.get(oppId);
+    if (!entry) {
+      entry = {
+        opponentId: oppId,
+        opponentName: opponent.username,
+        opponentGroupName: opponent.group?.name ?? null,
+        opponentGroupColor: opponent.group?.color ?? null,
+        games: 0,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        lastPlayed: null,
+      };
+      byOpponent.set(oppId, entry);
+    }
+
+    entry.games += 1;
+    if (!g.winnerId) {
+      entry.draws += 1;
+    } else if (g.winnerId === uid) {
+      entry.wins += 1;
+    } else if (g.winnerId === oppId) {
+      entry.losses += 1;
+    }
+
+    const ts = g.createdAt instanceof Date ? g.createdAt : new Date(g.createdAt);
+    if (!entry.lastPlayed || ts > entry.lastPlayed) {
+      entry.lastPlayed = ts;
+    }
+  }
+
+  const summary = Array.from(byOpponent.values()).map((e) => {
+    const decided = e.wins + e.losses;
+    const winPercentage = decided > 0 ? Number(((e.wins / decided) * 100).toFixed(2)) : 0;
+    return { ...e, winPercentage };
+  });
+
+  summary.sort((a, b) => {
+    if (b.games !== a.games) return b.games - a.games;
+    if (b.winPercentage !== a.winPercentage) return b.winPercentage - a.winPercentage;
+    return a.opponentName.localeCompare(b.opponentName, 'he');
+  });
+
+  return summary;
 }
 

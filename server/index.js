@@ -10,6 +10,7 @@ import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import { register as registerUser, login as loginUser } from './controllers/authController.js';
 import { saveGameResult } from './controllers/gameController.js';
+import { getUserStats, getHeadToHeadSummaryForUser } from './controllers/statsController.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const prisma = new PrismaClient();
@@ -1148,9 +1149,8 @@ app.get('/api/leaderboard', async (req, res) => {
         username: true,
         wins: true,
         losses: true,
-        draws: true,
         group: {
-          select: { id: true, name: true, color: true, totalWins: true, totalLosses: true, totalDraws: true },
+          select: { id: true, name: true, color: true, totalWins: true, totalLosses: true },
         },
       },
     });
@@ -1164,7 +1164,6 @@ app.get('/api/leaderboard', async (req, res) => {
         color: true,
         totalWins: true,
         totalLosses: true,
-        totalDraws: true,
       },
     });
 
@@ -1195,6 +1194,108 @@ app.get('/api/rooms/active', (req, res) => {
   } catch (err) {
     console.error('Error listing active rooms', err);
     res.status(500).json({ error: 'Failed to load active rooms' });
+  }
+});
+
+app.get('/api/stats/groups', async (req, res) => {
+  try {
+    const groups = await prisma.group.findMany({
+      select: {
+        id: true,
+        name: true,
+        color: true,
+        totalWins: true,
+        totalLosses: true,
+      },
+    });
+
+    const enriched = groups
+      .map((g) => {
+        const games = g.totalWins + g.totalLosses;
+        const winPercentage = games > 0 ? Number(((g.totalWins / games) * 100).toFixed(2)) : 0;
+        return {
+          id: g.id,
+          name: g.name,
+          color: g.color,
+          wins: g.totalWins,
+          losses: g.totalLosses,
+          games,
+          winPercentage,
+        };
+      })
+      // Only show groups that have played at least one game
+      .filter((g) => g.games > 0)
+      // Sort: wins desc, then win% desc, then name asc
+      .sort((a, b) => {
+        if (b.wins !== a.wins) return b.wins - a.wins;
+        if (b.winPercentage !== a.winPercentage) return b.winPercentage - a.winPercentage;
+        return a.name.localeCompare(b.name, 'he');
+      });
+
+    res.json(enriched);
+  } catch (err) {
+    console.error('Error building group stats', err);
+    res.status(500).json({ error: 'Failed to load group stats' });
+  }
+});
+
+// Simple JWT auth helper for HTTP routes (reuses same secret as sockets)
+function getUserIdFromRequest(req) {
+  const authHeader = req.headers.authorization || '';
+  const [, token] = authHeader.split(' ');
+  if (!token) return null;
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    return decoded.sub ?? null;
+  } catch {
+    return null;
+  }
+}
+
+app.get('/api/stats/me', async (req, res) => {
+  try {
+    const userId = getUserIdFromRequest(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const [user, stats] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: Number(userId) },
+        select: {
+          id: true,
+          username: true,
+          wins: true,
+          losses: true,
+          group: { select: { id: true, name: true, color: true } },
+        },
+      }),
+      getUserStats(userId),
+    ]);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ user, stats });
+  } catch (err) {
+    console.error('Error building user stats', err);
+    res.status(500).json({ error: 'Failed to load user stats' });
+  }
+});
+
+app.get('/api/stats/headtohead', async (req, res) => {
+  try {
+    const userId = getUserIdFromRequest(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const summary = await getHeadToHeadSummaryForUser(userId);
+    res.json(summary);
+  } catch (err) {
+    console.error('Error building head-to-head stats', err);
+    res.status(500).json({ error: 'Failed to load head-to-head stats' });
   }
 });
 

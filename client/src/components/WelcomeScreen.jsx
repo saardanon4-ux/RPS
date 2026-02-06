@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../context/GameContext';
 import HowToPlayModal from './HowToPlayModal';
-import Leaderboard from './Leaderboard';
+import LeagueTable from './LeagueTable';
+import PlayerStatsPanel from './PlayerStatsPanel';
 
 export default function WelcomeScreen() {
   const { connected, roomId, player, error, joinRoom, leaveRoom, authUser, setAuth, clearAuth } =
@@ -19,9 +20,6 @@ export default function WelcomeScreen() {
   const [authLoading, setAuthLoading] = useState(false);
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [groupDropdownOpen, setGroupDropdownOpen] = useState(false);
-  const [activeRooms, setActiveRooms] = useState([]);
-  const [activeRoomsLoading, setActiveRoomsLoading] = useState(false);
-  const [activeRoomsError, setActiveRoomsError] = useState(null);
 
   const apiBase = import.meta.env.VITE_SERVER_URL || '';
 
@@ -47,36 +45,6 @@ export default function WelcomeScreen() {
     loadGroups();
     return () => {
       cancelled = true;
-    };
-  }, [apiBase]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadRooms = async () => {
-      try {
-        setActiveRoomsLoading(true);
-        setActiveRoomsError(null);
-        const res = await fetch(`${apiBase}/api/rooms/active`);
-        if (!res.ok) throw new Error('שגיאה בטעינת החדרים הפעילים');
-        const data = await res.json();
-        if (!cancelled) {
-          setActiveRooms(Array.isArray(data) ? data : []);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setActiveRoomsError(err.message || 'שגיאה בטעינת החדרים הפעילים');
-        }
-      } finally {
-        if (!cancelled) {
-          setActiveRoomsLoading(false);
-        }
-      }
-    };
-    loadRooms();
-    const interval = setInterval(loadRooms, 8000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
     };
   }, [apiBase]);
 
@@ -261,7 +229,7 @@ export default function WelcomeScreen() {
                   className={`flex-1 py-1.5 rounded-full text-xs font-semibold transition-colors ${
                     mode === 'login'
                       ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-white/70 hover:bg_WHITE/10'
+                      : 'text-white/70 hover:bg-white/10'
                   }`}
                 >
                   התחברות
@@ -272,7 +240,7 @@ export default function WelcomeScreen() {
                   className={`flex-1 py-1.5 rounded-full text-xs font-semibold transition-colors ${
                     mode === 'register'
                       ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-white/70 hover:bg_WHITE/10'
+                      : 'text-white/70 hover:bg-white/10'
                   }`}
                 >
                   הרשמה
@@ -296,7 +264,7 @@ export default function WelcomeScreen() {
                   onFocus={() => setFocusedField('username')}
                   onBlur={() => setFocusedField(null)}
                   placeholder="הקלד שם משתמש"
-                  className={`w-full px-4 py-3.5 rounded-xl bg_WHITE/5 border-2 text-white placeholder-white/40 outline-none transition-all duration-300 ${
+                  className={`w-full px-4 py-3.5 rounded-xl bg-white/5 border-2 text-white placeholder-white/40 outline-none transition-all duration-300 ${
                     focusedField === 'username'
                       ? 'border-amber-400/80 shadow-[0_0_20px_rgba(251,191,36,0.3)]'
                       : 'border-white/20 hover:border-white/30'
@@ -321,7 +289,7 @@ export default function WelcomeScreen() {
                   onFocus={() => setFocusedField('password')}
                   onBlur={() => setFocusedField(null)}
                   placeholder="בחר סיסמה סודית"
-                  className={`w-full px-4 py-3.5 rounded-xl bg_WHITE/5 border-2 text-white placeholder-white/40 outline-none transition-all duration-300 ${
+                  className={`w-full px-4 py-3.5 rounded-xl bg-white/5 border-2 text-white placeholder-white/40 outline-none transition-all duration-300 ${
                     focusedField === 'password'
                       ? 'border-amber-400/80 shadow-[0_0_20px_rgba(251,191,36,0.3)]'
                       : 'border-white/20 hover:border-white/30'
@@ -342,7 +310,7 @@ export default function WelcomeScreen() {
                     <button
                       type="button"
                       onClick={() => setGroupDropdownOpen((open) => !open)}
-                      className="w-full px-4 py-3.5 rounded-xl bg_WHITE/5 border-2 border-white/20 hover:border-white/30 text-right flex items-center justify-between gap-3 text-sm text-white/90"
+                      className="w-full px-4 py-3.5 rounded-xl bg-white/5 border-2 border-white/20 hover:border-white/30 text-right flex items-center justify-between gap-3 text-sm text-white/90"
                     >
                       <span className="flex items-center gap-2">
                         {selectedGroup ? (
@@ -374,7 +342,7 @@ export default function WelcomeScreen() {
                               setSelectedGroupId(group.id);
                               setGroupDropdownOpen(false);
                             }}
-                            className="w-full px-3 py-2.5 flex items-center justify-between gap-3 text-xs text-white/90 hover:bg_WHITE/10"
+                            className="w-full px-3 py-2.5 flex items-center justify-between gap-3 text-xs text-white/90 hover:bg-white/10"
                           >
                             <span className="flex items-center gap-2">
                               <span
@@ -430,7 +398,7 @@ export default function WelcomeScreen() {
 
           {authUser ? (
             <>
-              {/* Room / Lobby section (only for authenticated users) */}
+              {/* Room section (only for authenticated users) */}
               <form onSubmit={handleJoin} className="space-y-5">
                 <motion.div
                   initial={{ opacity: 0, x: -10 }}
@@ -485,60 +453,13 @@ export default function WelcomeScreen() {
                     whileHover={connected ? { scale: 1.02 } : {}}
                     whileTap={connected ? { scale: 0.98 } : {}}
                   >
-                    {!connected ? 'מתחבר לשרת...' : 'הצטרף למשחק'}
+                    {!connected ? 'מתחבר לשרת...' : 'היכנס למגרש'}
                   </motion.button>
                 </motion.div>
               </form>
 
-              {/* Live lobby: active games */}
-              <div className="mt-6">
-                <h2 className="text-sm font-semibold text-white/90 mb-2">משחקים פעילים</h2>
-                {activeRoomsLoading && (
-                  <p className="text-xs text-white/70">טוען חדרים...</p>
-                )}
-                {activeRoomsError && !activeRoomsLoading && (
-                  <p className="text-xs text-red-400">{activeRoomsError}</p>
-                )}
-                {!activeRoomsLoading && !activeRoomsError && activeRooms.length === 0 && (
-                  <p className="text-xs text-white/60">אין כרגע חדרים פתוחים. פתח חדר חדש!</p>
-                )}
-                {!activeRoomsLoading && !activeRoomsError && activeRooms.length > 0 && (
-                  <div className="space-y-2">
-                    {activeRooms.map((room) => (
-                      <button
-                        key={room.roomId}
-                        type="button"
-                        onClick={() => {
-                          setInputRoomId(room.roomId);
-                          if (connected) {
-                            joinRoom(room.roomId);
-                          }
-                        }}
-                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white/90 hover:bg-white/10 transition-colors"
-                      >
-                        <div className="flex flex-col items-start gap-0.5">
-                          <span className="font-semibold">
-                            חדר {room.roomId}
-                          </span>
-                          <span className="text-[11px] text-white/70">
-                            יוצר: {room.playerName} {room.teamName ? `(${room.teamName})` : ''}
-                          </span>
-                        </div>
-                        <div className="flex flex-col items-end gap-0.5">
-                          <span className="text-[11px] text-white/70">
-                            מצב: {room.phase === 'WAITING' ? 'ממתין לשחקן' : 'שלב הכנה'}
-                          </span>
-                          <span className="text-[10px] text-white/60">
-                            שחקנים: {room.playersCount}/2
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <Leaderboard />
+              <PlayerStatsPanel />
+              <LeagueTable />
             </>
           ) : (
             <p className="mt-4 text-xs text-white/70">

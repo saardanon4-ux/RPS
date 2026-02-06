@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const RPS_OPTIONS = [
-  { type: 'rock', label: 'Rock', src: '/assets/unit-rock.png' },
-  { type: 'paper', label: 'Paper', src: '/assets/unit-paper.png' },
-  { type: 'scissors', label: 'Scissors', src: '/assets/unit-scissors.png' },
+  { type: 'rock', label: 'אבן', src: '/assets/unit-rock.png' },
+  { type: 'paper', label: 'נייר', src: '/assets/unit-paper.png' },
+  { type: 'scissors', label: 'מספריים', src: '/assets/unit-scissors.png' },
 ];
 
 export default function TieBreakerModal({ tieBreakerState, isPlayer2, onSubmitChoice, lastTieCombat }) {
@@ -34,7 +34,7 @@ export default function TieBreakerModal({ tieBreakerState, isPlayer2, onSubmitCh
 
   if (!tieBreakerState) return null;
   const unitType = tieBreakerState?.unitType;
-  const unitLabel = unitType ? unitType[0].toUpperCase() + unitType.slice(1) : 'Unit';
+  const unitLabel = unitType ? unitType[0].toUpperCase() + unitType.slice(1) : 'יחידה';
   const unitSrc = unitType ? `/assets/unit-${unitType}.png` : null;
   const lastTieType = lastTieCombat?.attackerType;
   const lastTieLabel = lastTieType ? lastTieType[0].toUpperCase() + lastTieType.slice(1) : null;
@@ -54,23 +54,23 @@ export default function TieBreakerModal({ tieBreakerState, isPlayer2, onSubmitCh
         animate={{ scale: 1 }}
         transition={{ type: 'spring', stiffness: 200 }}
       >
-        <h2 className="text-lg font-bold text-amber-400 uppercase tracking-wider">
-          Sudden Death!
+        <h2 className="text-lg font-bold text-amber-400 tracking-wider">
+          שובר שוויון
         </h2>
         <p className="text-stone-400 text-xs sm:text-sm text-center">
-          Same unit type! Pick Rock, Paper, or Scissors to break the tie.
+          אותה יחידה בשני הצדדים! בחר אבן, נייר או מספריים כדי לשבור את השוויון.
         </p>
 
         {unitSrc && (
           <div className="flex items-center justify-center gap-4 -mt-1">
             <div className="flex flex-col items-center gap-2">
               <img src={unitSrc} alt={unitLabel} className="w-12 h-12 object-contain drop-shadow-lg" />
-              <span className="text-[11px] text-stone-400 font-medium">Your unit</span>
+              <span className="text-[11px] text-stone-400 font-medium">היחידה שלך</span>
             </div>
-            <span className="text-stone-500 text-xs sm:text-sm font-semibold">vs</span>
+            <span className="text-stone-500 text-xs sm:text-sm font-semibold">נגד</span>
             <div className="flex flex-col items-center gap-2">
               <img src={unitSrc} alt={unitLabel} className="w-12 h-12 object-contain drop-shadow-lg" />
-              <span className="text-[11px] text-stone-400 font-medium">Opponent</span>
+              <span className="text-[11px] text-stone-400 font-medium">היריב</span>
             </div>
           </div>
         )}
@@ -78,18 +78,18 @@ export default function TieBreakerModal({ tieBreakerState, isPlayer2, onSubmitCh
         {(isRestart || wasTimeout) && (
           <div className="flex flex-col items-center gap-1 -mt-1">
             <p className="text-sm sm:text-base font-bold text-amber-400 text-center">
-              {wasTimeout ? "Time's up! Choose again" : "DRAW — choose again"}
+              {wasTimeout ? 'הזמן נגמר! בחר מחדש' : 'תיקו — בחרו שוב'}
             </p>
             {!wasTimeout && lastTieSrc && (
               <div className="flex items-center justify-center gap-4">
                 <div className="flex items-center gap-2">
                   <img src={lastTieSrc} alt={lastTieLabel ?? 'Your choice'} className="w-10 h-10 object-contain drop-shadow-lg" />
-                  <span className="text-[11px] text-stone-400 font-medium">You</span>
+                  <span className="text-[11px] text-stone-400 font-medium">אתה</span>
                 </div>
-                <span className="text-stone-500 text-sm font-semibold">vs</span>
+                <span className="text-stone-500 text-sm font-semibold">נגד</span>
                 <div className="flex items-center gap-2">
                   <img src={lastTieSrc} alt={lastTieLabel ?? 'Opponent choice'} className="w-10 h-10 object-contain drop-shadow-lg" />
-                  <span className="text-[11px] text-stone-400 font-medium">Opponent</span>
+                  <span className="text-[11px] text-stone-400 font-medium">היריב</span>
                 </div>
               </div>
             )}
@@ -103,7 +103,7 @@ export default function TieBreakerModal({ tieBreakerState, isPlayer2, onSubmitCh
         >
           {countdown !== null && countdown > 0 && (
             <span className="text-xl sm:text-2xl font-bold text-amber-400 tabular-nums">
-              {countdown} sec
+              {countdown} שניות
             </span>
           )}
           <div className="flex gap-2 justify-between w-full max-w-xs">

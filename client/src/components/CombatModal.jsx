@@ -19,12 +19,12 @@ const IS_MOBILE =
 function getResultLabel(result, attackerId, playerId, attackerType, defenderType) {
   if (result === 'both_destroyed') {
     const type = attackerType || defenderType;
-    const label = type ? `${UNIT_EMOJI[type] ?? type} vs ${UNIT_EMOJI[type] ?? type}` : '';
-    return label ? `${label} — DRAW!` : 'DRAW!';
+    const label = type ? `${UNIT_EMOJI[type] ?? type} נגד ${UNIT_EMOJI[type] ?? type}` : '';
+    return label ? `${label} — תיקו!` : 'תיקו!';
   }
-  if (result === 'trap_kills') return attackerId === playerId ? 'STUCK!' : 'TRAPPED!';
+  if (result === 'trap_kills') return attackerId === playerId ? 'נתפסת במלכודת!' : 'היריב נלכד!';
   const iWon = result === 'attacker_wins' ? attackerId === playerId : attackerId !== playerId;
-  return iWon ? 'WIN!' : 'LOSE';
+  return iWon ? 'ניצחון!' : 'הפסד';
 }
 
 // --- Animation variants by scenario ---
@@ -186,8 +186,8 @@ export default function CombatModal({ combatState, playerId, isPlayer2, onComple
   const bothDestroyed = result === 'both_destroyed';
   const isTrap = result === 'trap_kills';
 
-  const leftLabel = combatState.attackerId === playerId ? 'Your unit' : 'Opponent';
-  const rightLabel = combatState.attackerId === playerId ? 'Opponent' : 'Your unit';
+  const leftLabel = combatState.attackerId === playerId ? 'היחידה שלך' : 'היריב';
+  const rightLabel = combatState.attackerId === playerId ? 'היריב' : 'היחידה שלך';
 
   const resultLabel = getResultLabel(result, combatState.attackerId, playerId, attackerType, defenderType);
 
@@ -224,12 +224,12 @@ export default function CombatModal({ combatState, playerId, isPlayer2, onComple
         transition={{ duration: 0.4 }}
       >
         <motion.p
-          className="text-amber-400 font-bold text-xs uppercase tracking-[0.2em]"
+          className="text-amber-400 font-bold text-xs tracking-[0.2em]"
           initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={reduceMotion ? undefined : { delay: 0.1 }}
         >
-          {isTrap ? 'Caught in a trap!' : 'Combat!'}
+          {isTrap ? 'מלכודת הופעלה!' : 'קרב!'}
         </motion.p>
         <div className="flex items-center gap-4 relative min-h-[140px] w-[280px] justify-center">
           {showScissorsFragments && <ScissorsFragments visible />}
@@ -344,7 +344,7 @@ export default function CombatModal({ combatState, playerId, isPlayer2, onComple
               {defenderEmoji}
             </motion.span>
             <span className="text-xs text-stone-400 font-medium">
-              {defenderType === 'trap' ? 'Trap!' : rightLabel}
+              {defenderType === 'trap' ? 'מלכודת' : rightLabel}
             </span>
           </motion.div>
         </div>
@@ -359,9 +359,9 @@ export default function CombatModal({ combatState, playerId, isPlayer2, onComple
             }
             style={{
               color:
-                resultLabel === 'WIN!' ? '#22c55e'
-                  : resultLabel === 'LOSE' ? '#ef4444'
-                  : resultLabel === 'STUCK!' || resultLabel === 'TRAPPED!' ? '#10b981'
+                resultLabel === 'ניצחון!' ? '#22c55e'
+                  : resultLabel === 'הפסד' ? '#ef4444'
+                  : resultLabel.startsWith('נתפסת') || resultLabel.includes('נלכד') ? '#10b981'
                   : '#f59e0b',
             }}
           >

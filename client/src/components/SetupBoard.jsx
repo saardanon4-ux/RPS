@@ -12,11 +12,11 @@ const UNIT_EMOJI = {
 };
 
 const PALETTE_TYPES = [
-  { type: 'rock', label: 'Rock', emoji: '🪨', limit: null },
-  { type: 'paper', label: 'Paper', emoji: '📄', limit: null },
-  { type: 'scissors', label: 'Scissors', emoji: '✂️', limit: null },
-  { type: 'flag', label: 'Flag', emoji: '🚩', limit: 1 },
-  { type: 'trap', label: 'Trap', emoji: '🪤', limit: 1 },
+  { type: 'rock', label: 'אבן', emoji: '🪨', limit: null },
+  { type: 'paper', label: 'נייר', emoji: '📄', limit: null },
+  { type: 'scissors', label: 'מספריים', emoji: '✂️', limit: null },
+  { type: 'flag', label: 'דגל', emoji: '🚩', limit: 1 },
+  { type: 'trap', label: 'מלכודת', emoji: '🪤', limit: 1 },
 ];
 
 const TILE_BASE =
@@ -99,7 +99,7 @@ export default function SetupBoard() {
   return (
     <div className="flex flex-col items-center gap-4 w-full max-w-lg">
       <p className="text-sm text-stone-800 dark:text-white/80">
-        {setupTimer !== null ? `${setupTimer}s left` : 'Setup'}
+        {setupTimer !== null ? `${setupTimer} שניות נותרו` : 'שלב הכנה'}
       </p>
 
       {/* Grid with slot styling */}
@@ -149,7 +149,7 @@ export default function SetupBoard() {
       {/* Unit Palette */}
       <div className="w-full">
         <p className="text-sm text-stone-800 dark:text-white/70 mb-2 text-center">
-          Select type, then click a slot. Click placed unit to remove.
+          בחר סוג יחידה ואז לחץ על משבצת. לחץ שוב כדי להסיר יחידה.
         </p>
         <div className="flex flex-wrap gap-2 justify-center">
           {PALETTE_TYPES.map(({ type, label, emoji, limit }) => {
@@ -193,7 +193,7 @@ export default function SetupBoard() {
           onClick={randomizeSetup}
           className="px-4 py-2 rounded-lg bg-stone-200 dark:bg-stone-700 hover:bg-stone-300 dark:hover:bg-stone-600 font-medium transition-colors"
         >
-          Randomize (fill empty)
+          סידור אוטומטי (מילוי משבצות ריקות)
         </button>
         <button
           type="button"
@@ -201,13 +201,13 @@ export default function SetupBoard() {
           disabled={!allPlaced}
           className="px-6 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-stone-400 disabled:cursor-not-allowed font-medium text-white transition-colors"
         >
-          Ready
+          מוכן
         </button>
       </div>
 
       {setupReady && Object.keys(setupReady).length > 0 && (
         <p className="text-sm text-stone-800 dark:text-white/70">
-          Ready: {Object.entries(setupReady).filter(([, r]) => r).length}/2
+          מוכנים: {Object.entries(setupReady).filter(([, r]) => r).length}/2
         </p>
       )}
     </div>

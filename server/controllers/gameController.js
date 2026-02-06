@@ -39,39 +39,7 @@ export async function saveGameResult(playerAId, playerBId, winnerId) {
     const ops = [];
 
     if (w == null) {
-      // Draw: both players + their groups get a draw
-      if (userA) {
-        ops.push(
-          tx.user.update({
-            where: { id: userA.id },
-            data: { draws: { increment: 1 } },
-          }),
-        );
-        if (userA.groupId != null) {
-          ops.push(
-            tx.group.update({
-              where: { id: userA.groupId },
-              data: { totalDraws: { increment: 1 } },
-            }),
-          );
-        }
-      }
-      if (userB) {
-        ops.push(
-          tx.user.update({
-            where: { id: userB.id },
-            data: { draws: { increment: 1 } },
-          }),
-        );
-        if (userB.groupId != null) {
-          ops.push(
-            tx.group.update({
-              where: { id: userB.groupId },
-              data: { totalDraws: { increment: 1 } },
-            }),
-          );
-        }
-      }
+      // Draw: record the game only, do not update wins/losses.
     } else {
       const winnerUser = userMap.get(w);
       const loserId = w === a ? b : a;

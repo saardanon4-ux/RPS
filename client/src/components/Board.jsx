@@ -91,7 +91,7 @@ export default function Board() {
     return (
       <div className="inline-flex flex-col rounded-2xl overflow-hidden shadow-lg border border-white/10 p-6 bg-white/5 backdrop-blur-xl">
         <p className="text-sm text-white/70">
-          Waiting for opponent to join...
+          מחכה ליריב שיצטרף...
         </p>
       </div>
     );
