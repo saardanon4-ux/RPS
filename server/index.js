@@ -1316,8 +1316,9 @@ app.get('/api/stats/players', async (req, res) => {
 
     const enriched = users
       .map((u) => {
-        const games = u.wins + u.losses;
-        const winPercentage = games > 0 ? Number(((u.wins / games) * 100).toFixed(2)) : 0;
+        const gamesPlayed = u.wins + u.losses;
+        const winPercentage = gamesPlayed > 0 ? Number(((u.wins / gamesPlayed) * 100).toFixed(2)) : 0;
+        const isRanked = gamesPlayed >= 8;
         return {
           id: u.id,
           username: u.username,
@@ -1325,11 +1326,17 @@ app.get('/api/stats/players', async (req, res) => {
           groupColor: u.group?.color ?? null,
           wins: u.wins,
           losses: u.losses,
-          games,
+          gamesPlayed,
           winPercentage,
+          isRanked,
         };
       })
-      .filter((u) => u.games > 0);
+      .filter((u) => u.gamesPlayed > 0)
+      .sort((a, b) => {
+        if (a.isRanked !== b.isRanked) return b.isRanked ? 1 : -1;
+        if (b.winPercentage !== a.winPercentage) return b.winPercentage - a.winPercentage;
+        return b.wins - a.wins;
+      });
 
     res.json(enriched);
   } catch (err) {
@@ -1352,25 +1359,25 @@ app.get('/api/stats/groups', async (req, res) => {
 
     const enriched = groups
       .map((g) => {
-        const games = g.totalWins + g.totalLosses;
-        const winPercentage = games > 0 ? Number(((g.totalWins / games) * 100).toFixed(2)) : 0;
+        const gamesPlayed = g.totalWins + g.totalLosses;
+        const winPercentage = gamesPlayed > 0 ? Number(((g.totalWins / gamesPlayed) * 100).toFixed(2)) : 0;
+        const isRanked = gamesPlayed >= 8;
         return {
           id: g.id,
           name: g.name,
           color: g.color,
           wins: g.totalWins,
           losses: g.totalLosses,
-          games,
+          gamesPlayed,
           winPercentage,
+          isRanked,
         };
       })
-      // Only show groups that have played at least one game
-      .filter((g) => g.games > 0)
-      // Sort: wins desc, then win% desc, then name asc
+      .filter((g) => g.gamesPlayed > 0)
       .sort((a, b) => {
-        if (b.wins !== a.wins) return b.wins - a.wins;
+        if (a.isRanked !== b.isRanked) return b.isRanked ? 1 : -1;
         if (b.winPercentage !== a.winPercentage) return b.winPercentage - a.winPercentage;
-        return a.name.localeCompare(b.name, 'he');
+        return b.wins - a.wins;
       });
 
     res.json(enriched);

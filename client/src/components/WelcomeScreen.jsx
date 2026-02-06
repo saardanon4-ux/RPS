@@ -664,53 +664,69 @@ export default function WelcomeScreen() {
                     <p className="text-xs text-white/60">עדיין אין תוצאות. שחקו משחק ראשון.</p>
                   )}
                   {!leaderboardLoading && !leaderboardError && leaderboardData.length > 0 && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs text-right text-white/90">
-                        <thead>
-                          <tr className="text-[11px] text-white/60 border-b border-white/10">
-                            <th className="pb-2 font-semibold">דירוג</th>
-                            <th className="pb-2 font-semibold pr-2">
-                              {leaderboardMode === 'players' ? 'שחקן' : 'קבוצה'}
-                            </th>
-                            <th className="pb-2 font-semibold">ניצחונות</th>
-                            <th className="pb-2 font-semibold">הפסדים</th>
-                            <th className="pb-2 font-semibold">אחוז ניצחונות</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {leaderboardData.map((row, idx) => (
-                            <tr
-                              key={row.id}
-                              className="border-b border-white/5 last:border-b-0 hover:bg-white/5"
-                            >
-                              <td className="py-1.5 text-center text-white/80">{idx + 1}</td>
-                              <td className="py-1.5 pr-2">
-                                <div className="flex items-center justify-start gap-2">
-                                  {(row.groupColor || row.color) && (
-                                    <span
-                                      className="inline-block w-2.5 h-2.5 rounded-full border border-white/60"
-                                      style={{
-                                        backgroundColor: row.groupColor || row.color || '#64748b',
-                                      }}
-                                    />
-                                  )}
-                                  <span className="font-semibold truncate">
-                                    {row.username || row.name}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="py-1.5 text-center">{row.wins}</td>
-                              <td className="py-1.5 text-center">{row.losses}</td>
-                              <td className="py-1.5 text-center">
-                                {row.winPercentage != null
-                                  ? `${row.winPercentage.toFixed(2)}%`
-                                  : '0%'}
-                              </td>
+                    <>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-right text-white/90">
+                          <thead>
+                            <tr className="text-[11px] text-white/60 border-b border-white/10">
+                              <th className="pb-2 font-semibold">דירוג</th>
+                              <th className="pb-2 font-semibold pr-2">
+                                {leaderboardMode === 'players' ? 'שחקן' : 'קבוצה'}
+                              </th>
+                              <th className="pb-2 font-semibold">ניצחונות</th>
+                              <th className="pb-2 font-semibold">הפסדים</th>
+                              <th className="pb-2 font-semibold">אחוז ניצחונות</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody>
+                            {leaderboardData.reduce((acc, row) => {
+                              const gamesPlayed = row.gamesPlayed ?? row.games ?? 0;
+                              const isRanked = gamesPlayed >= 8;
+                              const rank = isRanked ? acc.rank++ : null;
+                              acc.rows.push(
+                                <tr
+                                  key={row.id}
+                                  className={`border-b border-white/5 last:border-b-0 hover:bg-white/5 ${
+                                    !isRanked ? 'opacity-80' : ''
+                                  }`}
+                                  title={!isRanked ? 'לא מדורג - נדרשים מינימום 8 משחקים' : undefined}
+                                >
+                                  <td className="py-1.5 text-center text-white/80">
+                                    {isRanked ? rank : <span className="text-white/50">–</span>}
+                                  </td>
+                                  <td className="py-1.5 pr-2">
+                                    <div className="flex items-center justify-start gap-2">
+                                      {(row.groupColor || row.color) && (
+                                        <span
+                                          className="inline-block w-2.5 h-2.5 rounded-full border border-white/60"
+                                          style={{
+                                            backgroundColor: row.groupColor || row.color || '#64748b',
+                                          }}
+                                        />
+                                      )}
+                                      <span className="font-semibold truncate">
+                                        {row.username || row.name}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="py-1.5 text-center">{row.wins}</td>
+                                  <td className="py-1.5 text-center">{row.losses}</td>
+                                  <td className="py-1.5 text-center">
+                                    {row.winPercentage != null
+                                      ? `${row.winPercentage.toFixed(2)}%`
+                                      : '0%'}
+                                  </td>
+                                </tr>
+                              );
+                              return acc;
+                            }, { rank: 1, rows: [] }).rows}
+                          </tbody>
+                        </table>
+                      </div>
+                      <p className="mt-3 text-xs text-white/50 text-center">
+                        * הדירוג נקבע לפי אחוזי הצלחה. נדרשים מינימום 8 משחקים כדי להיכנס לדירוג.
+                      </p>
+                    </>
                   )}
                 </div>
               )}

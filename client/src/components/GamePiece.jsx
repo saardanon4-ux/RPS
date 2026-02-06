@@ -68,15 +68,15 @@ function simplifyColor(color) {
   return 'red';
 }
 
-/** White/Silver Away Kit filter (FIFA style) when opponent has same color as me. */
-const WHITE_AWAY_KIT_FILTER = 'grayscale(100%) brightness(150%) contrast(90%)';
+/** Gold/Yellow Away Kit filter when opponent has same color as me (keeps characters looking alive). */
+const GOLD_AWAY_KIT_FILTER = 'hue-rotate(60deg) brightness(110%) saturate(120%)';
 
 function GamePieceInner({ imagePath, alt, isHidden, isMine, myTeamColor, opponentTeamColor, displayColor }) {
   const isClash = simplifyColor(myTeamColor) === simplifyColor(opponentTeamColor);
 
   let finalFilter = 'none';
   if (!isMine && isClash) {
-    finalFilter = WHITE_AWAY_KIT_FILTER;
+    finalFilter = GOLD_AWAY_KIT_FILTER;
   } else if (isHidden) {
     finalFilter = 'brightness(1)';
   } else {

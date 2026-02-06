@@ -15,8 +15,8 @@ function PlayerSlot({ player, isCurrentTurn, isLocal, emoji, forceColorSwap }) {
   const winRate = Math.round((wins / total) * 100);
   const initial = name ? name.charAt(0).toUpperCase() : '?';
 
-  const avatarBg = forceColorSwap ? '#e5e7eb' : (teamColor || 'rgba(15,23,42,0.8)');
-  const dotColor = forceColorSwap ? '#9ca3af' : (teamColor || '#64748b');
+  const avatarBg = forceColorSwap ? '#ca8a04' : (teamColor || 'rgba(15,23,42,0.8)');
+  const dotColor = forceColorSwap ? '#eab308' : (teamColor || '#64748b');
 
   return (
     <motion.div
@@ -27,7 +27,7 @@ function PlayerSlot({ player, isCurrentTurn, isLocal, emoji, forceColorSwap }) {
       transition={{ duration: 0.3 }}
     >
       <div
-        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold shrink-0 border ${forceColorSwap ? 'border-slate-300/50 text-slate-700' : 'border-white/20 text-white/95'}`}
+        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold shrink-0 border ${forceColorSwap ? 'border-amber-400/50 text-amber-950' : 'border-white/20 text-white/95'}`}
         style={{
           background: avatarBg,
           boxShadow: isCurrentTurn ? '0 0 12px rgba(52,211,153,0.5)' : undefined,
