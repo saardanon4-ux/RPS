@@ -25,7 +25,7 @@ function getUnitImagePath(unit) {
 const IMMOBILE_TYPES = ['flag', 'trap'];
 
 const TILE_BASE =
-  'flex-1 min-w-0 aspect-square flex items-center justify-center p-1 text-xl sm:text-2xl font-medium transition-all duration-200 cursor-pointer select-none hover:brightness-110';
+  'w-full h-full flex items-center justify-center p-1 text-xl sm:text-2xl font-medium transition-all duration-200 cursor-pointer select-none hover:brightness-110';
 
 function getAdjacentKeys(row, col) {
   const keys = new Set();
