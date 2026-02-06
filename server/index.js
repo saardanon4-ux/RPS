@@ -662,6 +662,38 @@ io.on('connection', (socket) => {
       rooms.set(rid, room);
     }
 
+    const adapterSize = io.sockets.adapter.rooms.get(rid)?.size ?? 0;
+    const mapPlayersCount = room.players?.length ?? 0;
+    console.log('[join_room] roomId:', rid, 'adapter room size:', adapterSize, 'rooms Map players:', mapPlayersCount, 'room state:', JSON.stringify(room.players?.map((p) => ({ id: p.id, socketId: p.socketId }))));
+
+    // Remove ghost players: socketId set but socket no longer connected
+    const socketsMap = io.sockets.sockets;
+    const beforePrune = room.players.length;
+    const ghosts = room.players.filter((p) => p.socketId && !socketsMap.get(p.socketId));
+    ghosts.forEach((p) => {
+      if (room.disconnectTimers?.[p.id]) {
+        clearTimeout(room.disconnectTimers[p.id]);
+        delete room.disconnectTimers[p.id];
+      }
+    });
+    room.players = room.players.filter((p) => {
+      if (!p.socketId) return true;
+      return !!socketsMap.get(p.socketId);
+    });
+    const removed = beforePrune - room.players.length;
+    if (removed > 0) {
+      if (room.players.length === 0) {
+        if (room.setupInterval) clearInterval(room.setupInterval);
+        if (room.turnTimerInterval) clearInterval(room.turnTimerInterval);
+        if (room.tieBreaker?.timeoutId) clearTimeout(room.tieBreaker.timeoutId);
+        room.disconnectTimers = {};
+        rooms.delete(rid);
+        room = { roomId: rid, players: [], phase: 'WAITING', setupInterval: null, resultPersisted: false };
+        rooms.set(rid, room);
+      }
+      io.emit('room_update');
+    }
+
     const pid = socket.user?.id || socket.id;
     const existingPlayer = room.players.find((p) => p.id === pid);
 
@@ -1096,31 +1128,37 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    if (socket.roomId && socket.playerId) {
-      const room = rooms.get(socket.roomId);
+    const leftRoomId = socket.roomId;
+    const leftPlayerId = socket.playerId;
+    socket.roomId = null;
+    socket.playerId = null;
+
+    if (leftRoomId && leftPlayerId) {
+      const room = rooms.get(leftRoomId);
       if (room) {
-        const player = room.players.find((p) => p.id === socket.playerId);
+        const player = room.players.find((p) => p.id === leftPlayerId);
         if (player) {
-          // Mark player as temporarily disconnected and start grace timer.
           player.socketId = null;
           if (!room.disconnectTimers) room.disconnectTimers = {};
           if (room.disconnectTimers[player.id]) {
             clearTimeout(room.disconnectTimers[player.id]);
           }
           room.disconnectTimers[player.id] = setTimeout(() => {
-            const r = rooms.get(socket.roomId);
+            const r = rooms.get(leftRoomId);
             if (!r) return;
-            const still = r.players.find((p) => p.id === player.id);
-            // If player reconnected (socketId restored) – do nothing.
+            const still = r.players.find((p) => p.id === leftPlayerId);
             if (!still || still.socketId) return;
 
-            // Treat as permanent leave after grace period.
-            r.players = r.players.filter((p) => p.id !== player.id);
+            r.players = r.players.filter((p) => p.id !== leftPlayerId);
+            delete r.disconnectTimers?.[leftPlayerId];
+
             if (r.players.length === 0) {
               if (r.setupInterval) clearInterval(r.setupInterval);
               if (r.turnTimerInterval) clearInterval(r.turnTimerInterval);
               if (r.tieBreaker?.timeoutId) clearTimeout(r.tieBreaker.timeoutId);
+              r.disconnectTimers = {};
               rooms.delete(r.roomId);
+              io.emit('room_update');
               return;
             }
 
@@ -1138,15 +1176,16 @@ io.on('connection', (socket) => {
               io.to(q.socketId).emit('room_updated', { roomId: r.roomId, players: r.players.map((x) => ({ id: x.id, name: x.name, side: x.side })) });
               io.to(q.socketId).emit('game_over', { winnerId: remaining.id, flagCapture: false, disconnectWin: true });
             });
-            const explicitIds = [player.id, remaining.id].filter((id) => id != null);
+            const explicitIds = [leftPlayerId, remaining.id].filter((id) => id != null);
             if (explicitIds.length === 2) {
               recordGameResultForRoom(r, remaining.id, explicitIds);
             }
+            io.emit('room_update');
           }, DISCONNECT_GRACE_MS);
         }
       }
     }
-    console.log('Client disconnected:', socket.id);
+    console.log('Client disconnected:', socket.id, 'roomId:', leftRoomId, 'playerId:', leftPlayerId);
   });
 });
 

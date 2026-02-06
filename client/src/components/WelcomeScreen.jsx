@@ -5,7 +5,7 @@ import HowToPlayModal from './HowToPlayModal';
 import PlayerStatsPanel from './PlayerStatsPanel';
 
 export default function WelcomeScreen() {
-  const { connected, roomId, player, error, joinRoom, leaveRoom, authUser, setAuth, clearAuth } =
+  const { connected, roomId, player, error, joinRoom, leaveRoom, authUser, setAuth, clearAuth, roomListVersion } =
     useGame();
   const [inputRoomId, setInputRoomId] = useState('');
   const [focusedField, setFocusedField] = useState(null);
@@ -84,7 +84,7 @@ export default function WelcomeScreen() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [authUser, activeTab, apiBase]);
+  }, [authUser, activeTab, apiBase, roomListVersion]);
 
   // Fetch leaderboard when Leaderboard tab is active
   useEffect(() => {

@@ -31,6 +31,7 @@ export function GameProvider({ children }) {
   const [emojiReactions, setEmojiReactions] = useState({});
   const [authUser, setAuthUser] = useState(null);
   const [authToken, setAuthToken] = useState(null);
+  const [roomListVersion, setRoomListVersion] = useState(0);
   const stateRef = useRef({ roomId: '', player: null });
   stateRef.current = { roomId, player };
   // CRITICAL UI lock: prevents re-triggering animations due to duplicate/overlapping events.
@@ -271,6 +272,8 @@ export function GameProvider({ children }) {
     s.on('joined_room', onJoinedRoom);
     s.on('room_full', onRoomFull);
     s.on('room_updated', onRoomUpdated);
+    const onRoomUpdate = () => setRoomListVersion((v) => v + 1);
+    s.on('room_update', onRoomUpdate);
     s.on('setup_start', onSetupStart);
     s.on('setup_update', onSetupUpdate);
     s.on('setup_timer', onSetupTimer);
@@ -295,6 +298,7 @@ export function GameProvider({ children }) {
       s.off('joined_room', onJoinedRoom);
       s.off('room_full', onRoomFull);
       s.off('room_updated', onRoomUpdated);
+      s.off('room_update', onRoomUpdate);
       s.off('setup_start', onSetupStart);
       s.off('setup_update', onSetupUpdate);
       s.off('setup_timer', onSetupTimer);
@@ -471,6 +475,7 @@ export function GameProvider({ children }) {
         error,
         joinRoom,
         leaveRoom,
+        roomListVersion,
       }}
     >
       {children}
