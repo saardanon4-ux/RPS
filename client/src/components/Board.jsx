@@ -23,8 +23,8 @@ function getUnitImagePath(unit) {
   return UNIT_IMAGE_MAP[unit.type] ?? '/assets/unit-hidden.png';
 }
 
-/** Display color for opponent's glow when in color-clash (away kit). */
-const AWAY_KIT_GLOW = '#60a5fa';
+/** Display color for opponent's glow when in color-clash (White Away Kit). */
+const AWAY_KIT_GLOW = '#e5e7eb';
 
 const IMMOBILE_TYPES = ['flag', 'trap'];
 
