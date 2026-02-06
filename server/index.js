@@ -6,11 +6,18 @@ import { fileURLToPath } from 'url';
 import { existsSync } from 'fs';
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
+import cors from 'cors';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const prisma = new PrismaClient();
 const app = express();
 app.use(express.json());
+app.use(
+  cors({
+    origin: '*',
+    credentials: true,
+  }),
+);
 const httpServer = createServer(app);
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 const corsOrigins = CLIENT_URL.split(',')

@@ -125,7 +125,7 @@ export default function WelcomeScreen() {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 relative">
+    <div className="min-h-screen w-full flex items-center justify-center p-4 relative" dir="rtl">
       {/* Animated gradient background */}
       <div
         className="absolute inset-0 -z-10"
@@ -156,6 +156,7 @@ export default function WelcomeScreen() {
         <div
           className="rounded-3xl p-8 sm:p-10 backdrop-blur-xl bg-white/10 border border-white/20 shadow-2xl shadow-purple-900/20 relative"
           style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)' }}
+          dir="rtl"
         >
           <button
             type="button"
@@ -298,7 +299,7 @@ export default function WelcomeScreen() {
                   <button
                     type="button"
                     onClick={() => setGroupDropdownOpen((open) => !open)}
-                    className="w-full px-4 py-3.5 rounded-xl bg-white/5 border-2 border-white/20 hover:border-white/30 text-left flex items-center justify-between gap-3 text-sm text-white/90"
+                    className="w-full px-4 py-3.5 rounded-xl bg-white/5 border-2 border-white/20 hover:border-white/30 text-right flex items-center justify-between gap-3 text-sm text-white/90"
                   >
                     <span className="flex items-center gap-2">
                       {selectedGroup ? (
