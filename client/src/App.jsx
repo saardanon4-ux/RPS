@@ -64,7 +64,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-indigo-950/50 to-slate-900 text-white flex flex-col">
+    <div className="h-[100dvh] bg-gradient-to-b from-slate-900 via-indigo-950/50 to-slate-900 text-white flex flex-col overflow-hidden">
       {opponentLeft && (
         <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center gap-4 px-4 py-3 bg-amber-900/90 border-b border-amber-600/50 backdrop-blur-sm">
           <span className="text-amber-200 font-medium">The other player left the room.</span>
@@ -103,7 +103,7 @@ export default function App() {
         </div>
       )}
 
-      <header className="flex flex-col items-center gap-3 px-4 py-3">
+      <header className="flex flex-col items-center gap-2 px-4 py-2 shrink-0">
         <div className="flex items-center justify-between w-full">
           <h1 className="text-xl font-bold tracking-tight text-white/90 shrink-0" style={{ fontFamily: "'Orbitron', sans-serif" }}>
             RPS STRATEGO
@@ -127,8 +127,8 @@ export default function App() {
         )}
       </header>
 
-      <div className="flex-1 flex flex-col relative min-h-0">
-        <main className="flex-1 flex items-center justify-center p-4">
+      <div className="flex-1 flex flex-col relative min-h-0 overflow-hidden">
+        <main className="flex-1 min-h-0 overflow-y-auto flex items-center justify-center p-4">
           {setupPhase ? <SetupBoard /> : <Board />}
         </main>
       </div>

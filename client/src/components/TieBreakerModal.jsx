@@ -49,25 +49,25 @@ export default function TieBreakerModal({ tieBreakerState, isPlayer2, onSubmitCh
       exit={{ opacity: 0 }}
     >
       <motion.div
-        className="flex flex-col items-center gap-5 px-5 py-6 sm:px-8 sm:py-8 bg-stone-900/95 rounded-2xl border-2 border-amber-500/50 shadow-2xl max-w-sm w-full mx-4 max-h-[90vh] overflow-y-auto"
+        className="flex flex-col items-center gap-4 px-4 py-5 sm:px-6 sm:py-6 bg-stone-900/95 rounded-2xl border-2 border-amber-500/50 shadow-2xl max-w-sm w-full mx-4"
         initial={{ scale: 0.9 }}
         animate={{ scale: 1 }}
         transition={{ type: 'spring', stiffness: 200 }}
       >
-        <h2 className="text-xl font-bold text-amber-400 uppercase tracking-wider">
+        <h2 className="text-lg font-bold text-amber-400 uppercase tracking-wider">
           Sudden Death!
         </h2>
-        <p className="text-stone-400 text-sm text-center">
+        <p className="text-stone-400 text-xs sm:text-sm text-center">
           Same unit type! Pick Rock, Paper, or Scissors to break the tie.
         </p>
 
         {unitSrc && (
-          <div className="flex items-center justify-center gap-6 -mt-1">
+          <div className="flex items-center justify-center gap-4 -mt-1">
             <div className="flex flex-col items-center gap-2">
               <img src={unitSrc} alt={unitLabel} className="w-12 h-12 object-contain drop-shadow-lg" />
               <span className="text-[11px] text-stone-400 font-medium">Your unit</span>
             </div>
-            <span className="text-stone-500 text-sm font-semibold">vs</span>
+            <span className="text-stone-500 text-xs sm:text-sm font-semibold">vs</span>
             <div className="flex flex-col items-center gap-2">
               <img src={unitSrc} alt={unitLabel} className="w-12 h-12 object-contain drop-shadow-lg" />
               <span className="text-[11px] text-stone-400 font-medium">Opponent</span>
@@ -76,8 +76,8 @@ export default function TieBreakerModal({ tieBreakerState, isPlayer2, onSubmitCh
         )}
 
         {(isRestart || wasTimeout) && (
-          <div className="flex flex-col items-center gap-2 -mt-2">
-            <p className="text-base font-bold text-amber-400 text-center">
+          <div className="flex flex-col items-center gap-1 -mt-1">
+            <p className="text-sm sm:text-base font-bold text-amber-400 text-center">
               {wasTimeout ? "Time's up! Choose again" : "DRAW — choose again"}
             </p>
             {!wasTimeout && lastTieSrc && (
@@ -102,11 +102,11 @@ export default function TieBreakerModal({ tieBreakerState, isPlayer2, onSubmitCh
           animate={{ opacity: 1 }}
         >
           {countdown !== null && countdown > 0 && (
-            <span className="text-2xl font-bold text-amber-400 tabular-nums">
+            <span className="text-xl sm:text-2xl font-bold text-amber-400 tabular-nums">
               {countdown} sec
             </span>
           )}
-          <div className="flex gap-4 justify-center flex-wrap">
+          <div className="flex gap-2 justify-between w-full max-w-xs">
           {RPS_OPTIONS.map((opt) => {
             const isSelected = selectedChoice === opt.type;
             return (
@@ -117,7 +117,7 @@ export default function TieBreakerModal({ tieBreakerState, isPlayer2, onSubmitCh
                   setSelectedChoice(opt.type);
                   onSubmitChoice(opt.type);
                 }}
-                className={`relative flex flex-col items-center justify-center gap-2 p-4 min-h-[80px] min-w-[80px] rounded-xl border-2 transition-all touch-manipulation ${
+                className={`relative flex flex-col items-center justify-center gap-1.5 p-3 min-h-[70px] min-w-[70px] rounded-xl border-2 transition-all touch-manipulation ${
                   isSelected
                     ? 'bg-amber-600/80 border-amber-400 ring-4 ring-amber-400/70 ring-offset-2 ring-offset-stone-900 shadow-lg shadow-amber-500/30'
                     : 'bg-stone-800 hover:bg-stone-700 active:bg-stone-600 border-stone-600 hover:border-amber-500/60'
@@ -125,11 +125,7 @@ export default function TieBreakerModal({ tieBreakerState, isPlayer2, onSubmitCh
                 whileHover={!isSelected ? { scale: 1.05 } : {}}
                 whileTap={{ scale: 0.98 }}
               >
-                <img
-                  src={opt.src}
-                  alt={opt.label}
-                  className="w-12 h-12 object-contain drop-shadow-lg"
-                />
+                <img src={opt.src} alt={opt.label} className="w-10 h-10 object-contain drop-shadow-lg" />
                 <span className={`text-xs font-medium ${isSelected ? 'text-amber-100' : 'text-stone-300'}`}>
                   {opt.label}
                 </span>
