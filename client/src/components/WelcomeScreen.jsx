@@ -61,13 +61,13 @@ export default function WelcomeScreen() {
       />
 
       <motion.div
-        className="w-full max-w-md relative z-[100] pointer-events-auto"
+        className="w-full max-w-md"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
         <div
-          className="rounded-3xl p-8 sm:p-10 backdrop-blur-xl bg-white/10 border border-white/20 shadow-2xl shadow-purple-900/20 relative z-[100] pointer-events-auto"
+          className="rounded-3xl p-8 sm:p-10 backdrop-blur-xl bg-white/10 border border-white/20 shadow-2xl shadow-purple-900/20"
           style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)' }}
         >
           <motion.h1
@@ -104,11 +104,10 @@ export default function WelcomeScreen() {
                 autoComplete="off"
                 value={inputRoomId}
                 onChange={(e) => setInputRoomId(e.target.value)}
-                onTouchStart={(e) => e.currentTarget.focus()}
                 onFocus={() => setFocusedField('room')}
                 onBlur={() => setFocusedField(null)}
                 placeholder="abc123 or leave empty for new"
-                className={`w-full px-4 py-3.5 rounded-xl bg-white/5 border-2 text-white placeholder-white/40 outline-none transition-all duration-300 select-text relative z-[100] pointer-events-auto ${
+                className={`w-full px-4 py-3.5 rounded-xl bg-white/5 border-2 text-white placeholder-white/40 outline-none transition-all duration-300 ${
                   focusedField === 'room'
                     ? 'border-amber-400/80 shadow-[0_0_20px_rgba(251,191,36,0.3)]'
                     : 'border-white/20 hover:border-white/30'
@@ -131,11 +130,10 @@ export default function WelcomeScreen() {
                 autoComplete="off"
                 value={inputName}
                 onChange={(e) => setInputName(e.target.value)}
-                onTouchStart={(e) => e.currentTarget.focus()}
                 onFocus={() => setFocusedField('name')}
                 onBlur={() => setFocusedField(null)}
                 placeholder="Your nickname"
-                className={`w-full px-4 py-3.5 rounded-xl bg-white/5 border-2 text-white placeholder-white/40 outline-none transition-all duration-300 select-text relative z-[100] pointer-events-auto ${
+                className={`w-full px-4 py-3.5 rounded-xl bg-white/5 border-2 text-white placeholder-white/40 outline-none transition-all duration-300 ${
                   focusedField === 'name'
                     ? 'border-amber-400/80 shadow-[0_0_20px_rgba(251,191,36,0.3)]'
                     : 'border-white/20 hover:border-white/30'
