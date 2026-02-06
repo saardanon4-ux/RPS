@@ -38,7 +38,7 @@ export async function register(username, password, groupName) {
     select: {
       id: true,
       username: true,
-      group: { select: { id: true, name: true } },
+      group: { select: { id: true, name: true, color: true } },
     },
   });
 

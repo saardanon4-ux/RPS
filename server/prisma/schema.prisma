@@ -17,6 +17,7 @@ datasource db {
 model Group {
   id    Int    @id @default(autoincrement())
   name  String @unique
+  color String @default("#000000")
   users User[]
 }
 
