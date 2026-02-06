@@ -50,11 +50,11 @@ function normalizeHex(color) {
   return String(color).replace(/^#/, '').toLowerCase().padEnd(6, '0').slice(0, 6);
 }
 
-/** Away kit filter when both teams have the same color: silver/white so opponent stays distinct. */
-const AWAY_KIT_FILTER = 'grayscale(100%) brightness(150%)';
+/** Away kit filter when both teams have the same color: Blue/Silver so opponent stays distinct (red base + hue-rotate 200deg). */
+const AWAY_KIT_FILTER = 'hue-rotate(200deg)';
 
 /** Display color for opponent's glow when in color-clash (away kit). */
-const AWAY_KIT_GLOW = '#c0c0c0';
+const AWAY_KIT_GLOW = '#60a5fa';
 
 /**
  * CSS filter for a piece image. Player always uses their team color; opponent uses away kit when colors clash.

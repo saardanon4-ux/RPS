@@ -120,11 +120,11 @@ export default function App() {
         </div>
       )}
 
-      <header className="flex flex-col items-center gap-2 px-4 py-2 shrink-0">
-        <div className="flex items-center justify-between w-full gap-3">
-          <div className="flex items-center gap-3 shrink-0">
+      <header className="flex flex-col items-center gap-2 px-3 sm:px-4 py-2 shrink-0 min-w-0 w-full">
+        <div className="flex flex-row items-center justify-between w-full gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <h1
-              className="text-xl font-bold tracking-tight text-white/90"
+              className="text-base sm:text-xl font-bold tracking-tight text-white/90 truncate"
               style={{ fontFamily: "'Orbitron', sans-serif" }}
             >
               אחסן, נייר ומספריים
@@ -138,7 +138,7 @@ export default function App() {
               <span className="whitespace-nowrap">איך משחקים?</span>
             </button>
           </div>
-          <div className="flex-1 flex justify-end min-w-0">
+          <div className="flex shrink-0 min-w-0">
             <WelcomeScreen />
           </div>
         </div>
