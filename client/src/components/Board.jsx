@@ -4,7 +4,7 @@ import { useGame } from '../context/GameContext';
 import CombatModal from './CombatModal';
 import TieBreakerModal from './TieBreakerModal';
 import FlagCaptureCelebration from './FlagCaptureCelebration';
-import GamePiece, { simplifyColor } from './GamePiece';
+import GamePiece, { isColorClash } from './GamePiece';
 
 const GRID_SIZE = 6;
 
@@ -41,7 +41,6 @@ function BoardCellInner({
   myTeamColor,
   opponentTeamColor,
   displayColor,
-  imagePath,
   isHidden,
   isRevealed,
   isBattleTarget,
@@ -100,15 +99,14 @@ function BoardCellInner({
             🤝 DRAW
           </motion.span>
         )}
-        {imagePath && (
+        {cell && (
           <GamePiece
-            imagePath={imagePath}
-            alt={cell?.type === 'hidden' ? 'Unknown unit' : cell?.type ?? 'Unit'}
-            isHidden={isHidden}
+            piece={cell}
             isMine={isMine}
             myTeamColor={myTeamColor}
             opponentTeamColor={opponentTeamColor}
             displayColor={displayColor}
+            isSelected={isSelected}
           />
         )}
       </motion.div>
@@ -123,7 +121,6 @@ function areCellPropsEqual(prev, next) {
   if (prev.isMine !== next.isMine) return false;
   if (prev.myTeamColor !== next.myTeamColor || prev.opponentTeamColor !== next.opponentTeamColor) return false;
   if (prev.displayColor !== next.displayColor) return false;
-  if (prev.imagePath !== next.imagePath) return false;
   if (prev.isBattleTarget !== next.isBattleTarget || prev.isDrawSquare !== next.isDrawSquare) return false;
   if (prev.combatState !== next.combatState || prev.tieBreakerState !== next.tieBreakerState) return false;
   if (prev.canMoveThisTurn !== next.canMoveThisTurn) return false;
@@ -215,7 +212,7 @@ export default function Board() {
   const opponent = players.find((p) => p.id !== playerId);
   const myTeamColor = me?.teamColor ?? '';
   const opponentTeamColor = opponent?.teamColor ?? '#ef4444';
-  const isClash = simplifyColor(myTeamColor) === simplifyColor(opponentTeamColor);
+  const isClash = isColorClash(myTeamColor, opponentTeamColor);
 
   return (
     <div className="relative flex flex-col items-center gap-4">
@@ -257,8 +254,6 @@ export default function Board() {
               const canMoveThisTurn = isMyMobileUnit && myTurn;
 
               const isRevealed = cell?.revealed === true && isMyUnit;
-
-              const imagePath = cell ? getUnitImagePath(cell) : null;
               const isHidden = cell?.type === 'hidden';
 
               const displayColor = isMyUnit ? myTeamColor : (isClash ? AWAY_KIT_GLOW : opponentTeamColor);
@@ -275,7 +270,6 @@ export default function Board() {
                   myTeamColor={myTeamColor}
                   opponentTeamColor={opponentTeamColor}
                   displayColor={displayColor}
-                  imagePath={imagePath}
                   isHidden={isHidden}
                   isRevealed={isRevealed}
                   isBattleTarget={isBattleTarget && (combatState || combatPending || tiePending || tieBreakerState)}
