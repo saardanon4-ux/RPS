@@ -19,6 +19,9 @@ const devOrigins = ['http://localhost:5174', 'http://127.0.0.1:5173', 'http://12
 const allowedOrigins = [...new Set([...corsOrigins, ...devOrigins])];
 
 const io = new Server(httpServer, {
+  // Relaxed heartbeat settings to be friendlier to slow / mobile networks
+  pingTimeout: 60000,
+  pingInterval: 25000,
   cors: {
     origin: allowedOrigins,
     methods: ['GET', 'POST'],

@@ -11,6 +11,11 @@ const UNIT_EMOJI = {
 
 const COMBAT_DURATION_MS = 2800;
 
+// Basic mobile detection to optionally reduce heavy animations on low-power devices
+const IS_MOBILE =
+  typeof window !== 'undefined' &&
+  /android|iphone|ipad|ipod/i.test(window.navigator.userAgent || '');
+
 function getResultLabel(result, attackerId, playerId, attackerType, defenderType) {
   if (result === 'both_destroyed') {
     const type = attackerType || defenderType;
@@ -195,8 +200,10 @@ export default function CombatModal({ combatState, playerId, isPlayer2, onComple
   const attackerVariant = getAnimationVariant(winnerType, loserType, attackerType, true);
   const defenderVariant = getAnimationVariant(winnerType, loserType, defenderType, false);
 
-  const showScissorsFragments = rockSmashesScissors && phase === 'impact';
-  const showPaperPieces = scissorsCutsPaper && phase === 'impact';
+  const reduceMotion = IS_MOBILE;
+
+  const showScissorsFragments = !reduceMotion && rockSmashesScissors && phase === 'impact';
+  const showPaperPieces = !reduceMotion && scissorsCutsPaper && phase === 'impact';
 
   const content = (
     <motion.div
@@ -209,14 +216,18 @@ export default function CombatModal({ combatState, playerId, isPlayer2, onComple
     >
       <motion.div
         className="flex flex-col items-center gap-8 px-10 py-8 bg-stone-900/90 rounded-2xl border-2 border-amber-500/40 shadow-2xl"
-        animate={phase === 'impact' && (rockSmashesScissors || isTrap) ? { x: [0, -10, 10, -6, 6, 0] } : {}}
+        animate={
+          !reduceMotion && phase === 'impact' && (rockSmashesScissors || isTrap)
+            ? { x: [0, -10, 10, -6, 6, 0] }
+            : {}
+        }
         transition={{ duration: 0.4 }}
       >
         <motion.p
           className="text-amber-400 font-bold text-xs uppercase tracking-[0.2em]"
-          initial={{ opacity: 0, y: -8 }}
+          initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
+          transition={reduceMotion ? undefined : { delay: 0.1 }}
         >
           {isTrap ? 'Caught in a trap!' : 'Combat!'}
         </motion.p>
@@ -227,13 +238,13 @@ export default function CombatModal({ combatState, playerId, isPlayer2, onComple
           {/* Left side (attacker) */}
           <motion.div
             className={`flex flex-col items-center gap-2 relative ${paperCoversRock && attackerType === 'paper' ? 'z-[50]' : 'z-10'}`}
-            initial={{ x: -100, opacity: 0 }}
-            animate={
-              phase === 'approach' || phase === 'clash' || phase === 'impact'
-                ? { x: 5, opacity: 1 }
-                : { x: 5, opacity: 1 }
+            initial={reduceMotion ? { x: 5, opacity: 1 } : { x: -100, opacity: 0 }}
+            animate={{ x: 5, opacity: 1 }}
+            transition={
+              reduceMotion || phase !== 'approach'
+                ? undefined
+                : { type: 'spring', stiffness: 120, damping: 18 }
             }
-            transition={phase === 'approach' ? { type: 'spring', stiffness: 120, damping: 18 } : {}}
           >
             <motion.span
               key={`att-${combatKey}`}
@@ -241,8 +252,9 @@ export default function CombatModal({ combatState, playerId, isPlayer2, onComple
               role="img"
               aria-label={attackerType}
               animate={
-                phase === 'impact'
-                  ? isTrap
+                reduceMotion || phase !== 'impact'
+                  ? {}
+                  : isTrap
                     ? { scale: [1, 0.8, 0.6], y: [0, 5, 10], opacity: [1, 0.8, 0] }
                     : bothDestroyed
                       ? { scale: [1, 1.4, 0], opacity: [1, 0.8, 0] }
@@ -251,9 +263,12 @@ export default function CombatModal({ combatState, playerId, isPlayer2, onComple
                         : attackerWins
                           ? { scale: [1, 1.5, 1.2] }
                           : { scale: [1, 0.5], opacity: [1, 0] }
-                  : {}
               }
-              transition={phase === 'impact' && attackerVariant ? {} : { duration: 0.6 }}
+              transition={
+                reduceMotion || (phase === 'impact' && attackerVariant)
+                  ? { duration: 0.3 }
+                  : { duration: 0.6 }
+              }
             >
               {attackerEmoji}
             </motion.span>
@@ -263,9 +278,9 @@ export default function CombatModal({ combatState, playerId, isPlayer2, onComple
           {(phase === 'approach' || phase === 'clash') && (
             <motion.span
               className="text-xl text-stone-500 absolute"
-              initial={{ opacity: 0 }}
+              initial={reduceMotion ? { opacity: 0.6 } : { opacity: 0 }}
               animate={{ opacity: 0.6 }}
-              transition={{ delay: 0.4 }}
+              transition={reduceMotion ? undefined : { delay: 0.4 }}
             >
               vs
             </motion.span>
@@ -274,13 +289,13 @@ export default function CombatModal({ combatState, playerId, isPlayer2, onComple
           {/* Defender - right side */}
           <motion.div
             className={`flex flex-col items-center gap-2 relative ${paperCoversRock && defenderType === 'paper' ? 'z-[50]' : 'z-10'}`}
-            initial={{ x: 100, opacity: 0 }}
-            animate={
-              phase === 'approach' || phase === 'clash' || phase === 'impact'
-                ? { x: -5, opacity: 1 }
-                : { x: -5, opacity: 1 }
+            initial={reduceMotion ? { x: -5, opacity: 1 } : { x: 100, opacity: 0 }}
+            animate={{ x: -5, opacity: 1 }}
+            transition={
+              reduceMotion || phase !== 'approach'
+                ? undefined
+                : { type: 'spring', stiffness: 120, damping: 18 }
             }
-            transition={phase === 'approach' ? { type: 'spring', stiffness: 120, damping: 18 } : {}}
           >
             {isTrap && phase === 'impact' && (
               <motion.div
@@ -308,8 +323,9 @@ export default function CombatModal({ combatState, playerId, isPlayer2, onComple
               role="img"
               aria-label={defenderType}
               animate={
-                phase === 'impact'
-                  ? isTrap
+                reduceMotion || phase !== 'impact'
+                  ? {}
+                  : isTrap
                     ? {}
                     : bothDestroyed
                       ? { scale: [1, 1.4, 0], opacity: [1, 0.8, 0] }
@@ -318,9 +334,12 @@ export default function CombatModal({ combatState, playerId, isPlayer2, onComple
                         : defenderWins
                           ? { scale: [1, 1.5, 1.2] }
                           : { scale: [1, 0.5], opacity: [1, 0] }
-                  : {}
               }
-              transition={phase === 'impact' && defenderVariant ? {} : { duration: 0.6 }}
+              transition={
+                reduceMotion || (phase === 'impact' && defenderVariant)
+                  ? { duration: 0.3 }
+                  : { duration: 0.6 }
+              }
             >
               {defenderEmoji}
             </motion.span>
@@ -333,9 +352,11 @@ export default function CombatModal({ combatState, playerId, isPlayer2, onComple
         {phase === 'impact' && (
           <motion.p
             className="text-2xl sm:text-3xl font-black uppercase tracking-wider"
-            initial={{ scale: 0.5, opacity: 0 }}
+            initial={reduceMotion ? { scale: 1, opacity: 1 } : { scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            transition={
+              reduceMotion ? { duration: 0.25 } : { type: 'spring', stiffness: 300, damping: 20 }
+            }
             style={{
               color:
                 resultLabel === 'WIN!' ? '#22c55e'

@@ -42,7 +42,10 @@ export function GameProvider({ children }) {
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      timeout: 20000,
+      // More forgiving connection / heartbeat settings for mobile
+      timeout: 60000,
+      pingTimeout: 60000,
+      pingInterval: 25000,
     });
 
     let reconnectRoomId = null;
