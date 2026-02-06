@@ -1,9 +1,10 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback, memo } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../context/GameContext';
 import CombatModal from './CombatModal';
 import TieBreakerModal from './TieBreakerModal';
 import FlagCaptureCelebration from './FlagCaptureCelebration';
+import GamePiece, { simplifyColor } from './GamePiece';
 
 const GRID_SIZE = 6;
 
@@ -22,53 +23,119 @@ function getUnitImagePath(unit) {
   return UNIT_IMAGE_MAP[unit.type] ?? '/assets/unit-hidden.png';
 }
 
-/** Base asset is red; map team color (hex) to hue-rotate so shirt matches. Only use for revealed piece images. */
-function getTeamFilter(teamColor) {
-  if (!teamColor) return 'none';
-  const hex = String(teamColor).replace(/^#/, '');
-  if (hex.length !== 6) return 'none';
-  const r = parseInt(hex.slice(0, 2), 16) / 255;
-  const g = parseInt(hex.slice(2, 4), 16) / 255;
-  const b = parseInt(hex.slice(4, 6), 16) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  let h = 0;
-  if (max !== min) {
-    const d = max - min;
-    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-    else if (max === g) h = ((b - r) / d + 2) / 6;
-    else h = ((r - g) / d + 4) / 6;
-  }
-  const hue = Math.round(h * 360);
-  if (hue <= 15 || hue >= 345) return 'none';
-  return `hue-rotate(${hue}deg)`;
-}
-
-/** Normalize hex for comparison (e.g. #ef4444 vs ef4444). */
-function normalizeHex(color) {
-  if (!color) return '';
-  return String(color).replace(/^#/, '').toLowerCase().padEnd(6, '0').slice(0, 6);
-}
-
-/** Away kit filter when both teams have the same color: Blue/Silver so opponent stays distinct (red base + hue-rotate 200deg). */
-const AWAY_KIT_FILTER = 'hue-rotate(200deg)';
-
 /** Display color for opponent's glow when in color-clash (away kit). */
 const AWAY_KIT_GLOW = '#60a5fa';
-
-/**
- * CSS filter for a piece image. Player always uses their team color; opponent uses away kit when colors clash.
- */
-function getPieceFilter(isMyUnit, teamColor, isColorClash) {
-  if (isMyUnit) return getTeamFilter(teamColor);
-  if (isColorClash) return AWAY_KIT_FILTER;
-  return getTeamFilter(teamColor);
-}
 
 const IMMOBILE_TYPES = ['flag', 'trap'];
 
 const TILE_BASE =
   'w-full h-full flex items-center justify-center p-1 text-xl sm:text-2xl font-medium transition-all duration-200 cursor-pointer select-none hover:brightness-110';
+
+function BoardCellInner({
+  row,
+  col,
+  cell,
+  isSelected,
+  isValidMove,
+  isMine,
+  myTeamColor,
+  opponentTeamColor,
+  displayColor,
+  imagePath,
+  isHidden,
+  isRevealed,
+  isBattleTarget,
+  isDrawSquare,
+  combatState,
+  tieBreakerState,
+  isPlayer2,
+  canMoveThisTurn,
+  onCellClick,
+}) {
+  const isCheckeredLight = (row + col) % 2 === 0;
+  let bgClass = isCheckeredLight ? 'bg-slate-700' : 'bg-slate-800';
+  if (isValidMove) bgClass = 'bg-yellow-300 dark:bg-yellow-600/80';
+  if (isSelected) bgClass += ' ring-2 ring-amber-500 ring-offset-1';
+  if (isBattleTarget) bgClass += ' ring-4 ring-red-600 ring-offset-1 animate-pulse';
+  if (isDrawSquare) bgClass += ' bg-stone-400 dark:bg-stone-500 animate-pulse';
+  if (canMoveThisTurn && !isSelected) bgClass += ' ring-2 ring-amber-400 ring-offset-1';
+
+  return (
+    <div
+      className="flex-1 min-w-0 aspect-square flex items-center justify-center"
+      style={isPlayer2 ? { transform: 'rotate(180deg)' } : undefined}
+      data-row={row}
+      data-col={col}
+    >
+      <motion.div
+        role="button"
+        tabIndex={0}
+        onClick={() => onCellClick(row, col)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') onCellClick(row, col);
+        }}
+        className={`${TILE_BASE} border border-slate-800/60 ${bgClass} relative ${isRevealed ? 'ring-1 ring-sky-400/70 ring-inset' : ''}`}
+        whileHover={{ scale: 1.02 }}
+        transition={{ duration: 0.15 }}
+      >
+        {isRevealed && (
+          <span className="absolute top-0 right-0 text-[8px] sm:text-[10px] leading-none bg-sky-500/80 text-white rounded-bl px-0.5" title="Revealed to enemy">👁</span>
+        )}
+        {isBattleTarget && combatState && (
+          <span
+            className="absolute inset-0 flex items-center justify-center pointer-events-none text-2xl opacity-90"
+            style={isPlayer2 ? { transform: 'rotate(180deg)' } : undefined}
+          >
+            ⚔️
+          </span>
+        )}
+        {isDrawSquare && (
+          <motion.span
+            className="absolute inset-0 flex items-center justify-center pointer-events-none text-lg font-bold text-white drop-shadow-lg z-10"
+            style={isPlayer2 ? { transform: 'rotate(180deg)' } : undefined}
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 300 }}
+          >
+            🤝 DRAW
+          </motion.span>
+        )}
+        {imagePath && (
+          <GamePiece
+            imagePath={imagePath}
+            alt={cell?.type === 'hidden' ? 'Unknown unit' : cell?.type ?? 'Unit'}
+            isHidden={isHidden}
+            isMine={isMine}
+            myTeamColor={myTeamColor}
+            opponentTeamColor={opponentTeamColor}
+            displayColor={displayColor}
+          />
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
+function areCellPropsEqual(prev, next) {
+  if (prev.row !== next.row || prev.col !== next.col) return false;
+  if (prev.isSelected !== next.isSelected || prev.isValidMove !== next.isValidMove) return false;
+  if (prev.isHidden !== next.isHidden || prev.isRevealed !== next.isRevealed) return false;
+  if (prev.isMine !== next.isMine) return false;
+  if (prev.myTeamColor !== next.myTeamColor || prev.opponentTeamColor !== next.opponentTeamColor) return false;
+  if (prev.displayColor !== next.displayColor) return false;
+  if (prev.imagePath !== next.imagePath) return false;
+  if (prev.isBattleTarget !== next.isBattleTarget || prev.isDrawSquare !== next.isDrawSquare) return false;
+  if (prev.combatState !== next.combatState || prev.tieBreakerState !== next.tieBreakerState) return false;
+  if (prev.canMoveThisTurn !== next.canMoveThisTurn) return false;
+  const pc = prev.cell;
+  const nc = next.cell;
+  if (pc === nc) return true;
+  if (!pc !== !nc) return false;
+  if (pc?.type !== nc?.type || pc?.owner !== nc?.owner || pc?.revealed !== nc?.revealed) return false;
+  return true;
+}
+
+const BoardCell = memo(BoardCellInner, areCellPropsEqual);
 
 function getAdjacentKeys(row, col) {
   const keys = new Set();
@@ -111,10 +178,11 @@ export default function Board() {
   const battleTargetKey = activeBattle?.toRow != null ? `${activeBattle.toRow},${activeBattle.toCol}` : null;
   const isDraw = combatState?.result === 'both_destroyed';
 
-  const handleCellClick = (row, col) => {
+  const handleCellClick = useCallback((row, col) => {
     if (gameOver || tieBreakerState) return;
 
-    const cell = gameState?.grid[row]?.[col];
+    const grid = gameState?.grid;
+    const cell = grid?.[row]?.[col];
     const key = `${row},${col}`;
 
     if (validMoves.has(key)) {
@@ -128,7 +196,7 @@ export default function Board() {
     } else {
       setSelected(null);
     }
-  };
+  }, [gameOver, tieBreakerState, gameState?.grid, validMoves, isMyTurn, playerId, selected, makeMove]);
 
   if (!hasValidGame) {
     return (
@@ -145,9 +213,9 @@ export default function Board() {
 
   const me = players.find((p) => p.id === playerId) || player;
   const opponent = players.find((p) => p.id !== playerId);
-  const myColor = me?.teamColor || '#22c55e';
-  const opponentColor = opponent?.teamColor || '#ef4444';
-  const isColorClash = normalizeHex(myColor) === normalizeHex(opponentColor);
+  const myTeamColor = me?.teamColor ?? '';
+  const opponentTeamColor = opponent?.teamColor ?? '#ef4444';
+  const isClash = simplifyColor(myTeamColor) === simplifyColor(opponentTeamColor);
 
   return (
     <div className="relative flex flex-col items-center gap-4">
@@ -184,107 +252,40 @@ export default function Board() {
 
               const isBattleTarget = key === battleTargetKey;
               const isDrawSquare = isBattleTarget && isDraw;
-              const isCheckeredLight = (row + col) % 2 === 0;
-              let bgClass = isCheckeredLight ? 'bg-slate-700' : 'bg-slate-800';
-              if (isValidMove) bgClass = 'bg-yellow-300 dark:bg-yellow-600/80';
-              if (isSelected) bgClass += ' ring-2 ring-amber-500 ring-offset-1';
-              if (isBattleTarget && (combatState || combatPending || tiePending || tieBreakerState)) bgClass += ' ring-4 ring-red-600 ring-offset-1 animate-pulse';
-              if (isDrawSquare) bgClass += ' bg-stone-400 dark:bg-stone-500 animate-pulse';
 
               const isMyMobileUnit = isMyUnit && cell && !IMMOBILE_TYPES.includes(cell.type);
               const canMoveThisTurn = isMyMobileUnit && myTurn;
-              if (canMoveThisTurn && !isSelected) bgClass += ' ring-2 ring-amber-400 ring-offset-1';
 
               const isRevealed = cell?.revealed === true && isMyUnit;
 
               const imagePath = cell ? getUnitImagePath(cell) : null;
               const isHidden = cell?.type === 'hidden';
 
-              const unitColor = isMyUnit ? myColor : opponentColor;
-              const displayColor = isMyUnit ? myColor : (isColorClash ? AWAY_KIT_GLOW : opponentColor);
-              const pieceFilter = getPieceFilter(isMyUnit, unitColor, isColorClash);
-
-              const imgProps = {
-                src: imagePath,
-                alt: cell?.type === 'hidden' ? 'Unknown unit' : cell?.type ?? 'Unit',
-                className: 'w-full h-full object-contain',
-                style: {
-                  filter: isHidden ? 'brightness(1)' : pieceFilter,
-                  boxShadow: `0 0 12px ${displayColor}aa`,
-                },
-              };
+              const displayColor = isMyUnit ? myTeamColor : (isClash ? AWAY_KIT_GLOW : opponentTeamColor);
 
               return (
-                <div
+                <BoardCell
                   key={key}
-                  className="flex-1 min-w-0 aspect-square flex items-center justify-center"
-                  style={isPlayer2 ? { transform: 'rotate(180deg)' } : undefined}
-                  data-row={row}
-                  data-col={col}
-                >
-                  <motion.div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleCellClick(row, col)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') handleCellClick(row, col);
-                    }}
-                    className={`${TILE_BASE} border border-slate-800/60 ${bgClass} relative ${isRevealed ? 'ring-1 ring-sky-400/70 ring-inset' : ''}`}
-                    whileHover={{ scale: 1.02 }}
-                    transition={{ duration: 0.15 }}
-                  >
-                  {isRevealed && (
-                    <span className="absolute top-0 right-0 text-[8px] sm:text-[10px] leading-none bg-sky-500/80 text-white rounded-bl px-0.5" title="Revealed to enemy">👁</span>
-                  )}
-                  {isBattleTarget && combatState && (
-                    <span
-                      className="absolute inset-0 flex items-center justify-center pointer-events-none text-2xl opacity-90"
-                      style={isPlayer2 ? { transform: 'rotate(180deg)' } : undefined}
-                    >
-                      ⚔️
-                    </span>
-                  )}
-                  {isDrawSquare && (
-                    <motion.span
-                      className="absolute inset-0 flex items-center justify-center pointer-events-none text-lg font-bold text-white drop-shadow-lg z-10"
-                      style={isPlayer2 ? { transform: 'rotate(180deg)' } : undefined}
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ type: 'spring', stiffness: 300 }}
-                    >
-                      🤝 DRAW
-                    </motion.span>
-                  )}
-                  {imagePath && (
-                    isHidden ? (
-                      <motion.img
-                        {...imgProps}
-                        animate={{
-                          scale: [1, 1.05, 1],
-                          rotate: [-2, 2, -2],
-                        }}
-                        transition={{
-                          duration: 2.5,
-                          repeat: Infinity,
-                          ease: 'easeInOut',
-                        }}
-                      />
-                    ) : (
-                      <motion.img
-                        {...imgProps}
-                        initial={{ scale: 0.9, opacity: 0.8 }}
-                        animate={{
-                          scale: [1, 1.04, 1],
-                          opacity: 1,
-                        }}
-                        transition={{
-                          scale: { duration: 2.2, repeat: Infinity, ease: 'easeInOut' },
-                        }}
-                      />
-                    )
-                  )}
-                  </motion.div>
-                </div>
+                  row={row}
+                  col={col}
+                  cell={cell}
+                  isSelected={isSelected}
+                  isValidMove={isValidMove}
+                  isMine={isMyUnit}
+                  myTeamColor={myTeamColor}
+                  opponentTeamColor={opponentTeamColor}
+                  displayColor={displayColor}
+                  imagePath={imagePath}
+                  isHidden={isHidden}
+                  isRevealed={isRevealed}
+                  isBattleTarget={isBattleTarget && (combatState || combatPending || tiePending || tieBreakerState)}
+                  isDrawSquare={isDrawSquare}
+                  combatState={combatState}
+                  tieBreakerState={tieBreakerState}
+                  isPlayer2={isPlayer2}
+                  canMoveThisTurn={canMoveThisTurn}
+                  onCellClick={handleCellClick}
+                />
               );
             })}
           </div>
