@@ -4,6 +4,7 @@ import WelcomeScreen from './components/WelcomeScreen';
 import GameHUD from './components/GameHUD';
 import SetupBoard from './components/SetupBoard';
 import HowToPlayModal from './components/HowToPlayModal';
+import MatchupScreen from './components/MatchupScreen';
 import { useGame } from './context/GameContext';
 
 const EMOJI_OPTIONS = ['🤫', '✂️', '🧠', '💣', '😂', '😈'];
@@ -50,6 +51,7 @@ export default function App() {
   const [turnRemaining, setTurnRemaining] = useState(30);
   const turnStartTime = gameState?.turnStartTime;
   const [showHowTo, setShowHowTo] = useState(false);
+  const [showMatchup, setShowMatchup] = useState(false);
   useEffect(() => {
     if (!turnStartTime) return;
     const tick = () => {
@@ -60,6 +62,13 @@ export default function App() {
     const id = setInterval(tick, 500);
     return () => clearInterval(id);
   }, [turnStartTime, gameState]);
+
+  useEffect(() => {
+    if (!setupPhase || players.length !== 2) return;
+    setShowMatchup(true);
+  }, [setupPhase, players.length]);
+
+  const closeMatchup = () => setShowMatchup(false);
 
   if (!inRoom) {
     return <WelcomeScreen />;
@@ -149,6 +158,14 @@ export default function App() {
       </div>
 
       <HowToPlayModal open={showHowTo} onClose={() => setShowHowTo(false)} />
+      {players.length === 2 && (
+        <MatchupScreen
+          visible={showMatchup}
+          onComplete={closeMatchup}
+          player1={players.find((p) => p.side === 'bottom') || players[0]}
+          player2={players.find((p) => p.side === 'top') || players[1]}
+        />
+      )}
     </div>
   );
 }

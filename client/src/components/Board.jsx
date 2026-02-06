@@ -100,6 +100,11 @@ export default function Board() {
   const { grid, currentTurn } = gameState;
   const myTurn = currentTurn === playerId;
 
+  const me = players.find((p) => p.id === playerId) || player;
+  const opponent = players.find((p) => p.id !== playerId);
+  const myColor = me?.teamColor || '#22c55e';
+  const opponentColor = opponent?.teamColor || '#ef4444';
+
   return (
     <div className="relative flex flex-col items-center gap-4">
       <div
@@ -136,7 +141,7 @@ export default function Board() {
               const isBattleTarget = key === battleTargetKey;
               const isDrawSquare = isBattleTarget && isDraw;
               const isCheckeredLight = (row + col) % 2 === 0;
-              let bgClass = isCheckeredLight ? 'bg-green-600' : 'bg-green-700';
+              let bgClass = isCheckeredLight ? 'bg-slate-700' : 'bg-slate-800';
               if (isValidMove) bgClass = 'bg-yellow-300 dark:bg-yellow-600/80';
               if (isSelected) bgClass += ' ring-2 ring-amber-500 ring-offset-1';
               if (isBattleTarget && (combatState || combatPending || tiePending || tieBreakerState)) bgClass += ' ring-4 ring-red-600 ring-offset-1 animate-pulse';
@@ -151,13 +156,16 @@ export default function Board() {
               const imagePath = cell ? getUnitImagePath(cell) : null;
               const isHidden = cell?.type === 'hidden';
 
+              const unitColor = isMyUnit ? myColor : opponentColor;
+
               const imgProps = {
                 src: imagePath,
                 alt: cell?.type === 'hidden' ? 'Unknown unit' : cell?.type ?? 'Unit',
-                className: 'w-full h-full object-contain drop-shadow-lg',
-                style: isEnemyUnit
-                  ? { filter: 'hue-rotate(180deg) brightness(90%)' }
-                  : undefined,
+                className: 'w-full h-full object-contain',
+                style: {
+                  filter: isHidden ? 'brightness(1)' : 'none',
+                  boxShadow: `0 0 12px ${unitColor}aa`,
+                },
               };
 
               return (
@@ -175,7 +183,7 @@ export default function Board() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') handleCellClick(row, col);
                     }}
-                    className={`${TILE_BASE} border border-green-800/50 ${bgClass} relative ${isRevealed ? 'ring-1 ring-sky-400/70 ring-inset' : ''}`}
+                    className={`${TILE_BASE} border border-slate-800/60 ${bgClass} relative ${isRevealed ? 'ring-1 ring-sky-400/70 ring-inset' : ''}`}
                     whileHover={{ scale: 1.02 }}
                     transition={{ duration: 0.15 }}
                   >

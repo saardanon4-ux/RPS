@@ -29,11 +29,30 @@ export function GameProvider({ children }) {
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState(null);
   const [emojiReactions, setEmojiReactions] = useState({});
+  const [authUser, setAuthUser] = useState(null);
+  const [authToken, setAuthToken] = useState(null);
   const stateRef = useRef({ roomId: '', player: null });
   stateRef.current = { roomId, player };
   // CRITICAL UI lock: prevents re-triggering animations due to duplicate/overlapping events.
   const isAnimatingRef = useRef(false);
   const preBattleTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    // Hydrate auth state from localStorage on first load
+    if (typeof localStorage === 'undefined') return;
+    const storedToken = localStorage.getItem('rps_auth_token');
+    const storedUser = localStorage.getItem('rps_auth_user');
+    if (storedToken && storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setAuthUser(parsedUser);
+        setAuthToken(storedToken);
+      } catch {
+        localStorage.removeItem('rps_auth_token');
+        localStorage.removeItem('rps_auth_user');
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const s = io(SOCKET_URL, {
@@ -321,6 +340,8 @@ export function GameProvider({ children }) {
       roomId: roomIdToUse,
       playerName: playerName || undefined,
       persistentPlayerId: persistentId,
+      teamName: authUser?.group?.name,
+      teamColor: authUser?.group?.color,
     });
   };
 
@@ -379,6 +400,32 @@ export function GameProvider({ children }) {
     socket.emit('send_emoji', { emoji });
   };
 
+  const setAuth = (user, token) => {
+    setAuthUser(user);
+    setAuthToken(token);
+    if (typeof localStorage !== 'undefined') {
+      if (token) {
+        localStorage.setItem('rps_auth_token', token);
+      } else {
+        localStorage.removeItem('rps_auth_token');
+      }
+      if (user) {
+        localStorage.setItem('rps_auth_user', JSON.stringify(user));
+      } else {
+        localStorage.removeItem('rps_auth_user');
+      }
+    }
+  };
+
+  const clearAuth = () => {
+    setAuthUser(null);
+    setAuthToken(null);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('rps_auth_token');
+      localStorage.removeItem('rps_auth_user');
+    }
+  };
+
   const clearCombatAndApplyState = () => {
     setCombatState(null);
     if (pendingGameState) {
@@ -410,6 +457,10 @@ export function GameProvider({ children }) {
         requestRematch,
         emojiReactions,
         sendEmoji,
+        authUser,
+        authToken,
+        setAuth,
+        clearAuth,
         makeMove,
         phase,
         setupPhase,

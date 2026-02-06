@@ -2,6 +2,8 @@ import { motion } from 'framer-motion';
 
 function PlayerSlot({ player, isCurrentTurn, isLocal, emoji }) {
   const name = player?.name || (isLocal ? 'You' : 'Opponent');
+  const teamName = player?.teamName || null;
+  const teamColor = player?.teamColor || null;
   const initial = name ? name.charAt(0).toUpperCase() : '?';
   return (
     <motion.div
@@ -12,23 +14,36 @@ function PlayerSlot({ player, isCurrentTurn, isLocal, emoji }) {
       transition={{ duration: 0.3 }}
     >
       <div
-        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 border ${
           isCurrentTurn
-            ? 'bg-gradient-to-br from-emerald-500/50 to-green-600/50 border-2 border-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.5)]'
-            : 'bg-white/10 border border-white/20'
+            ? 'shadow-[0_0_12px_rgba(52,211,153,0.5)]'
+            : 'border-white/20'
         }`}
+        style={{
+          background: teamColor || 'rgba(15,23,42,0.8)',
+          borderColor: teamColor ? '#ffffff' : 'rgba(148,163,184,0.6)',
+        }}
       >
         {initial}
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex flex-col gap-0.5 max-w-[120px]">
         <span
-          className={`font-semibold text-sm truncate max-w-[80px] ${
+          className={`font-semibold text-sm truncate ${
             isCurrentTurn ? 'text-emerald-300' : 'text-white/80'
           }`}
           style={isCurrentTurn ? { textShadow: '0 0 12px rgba(52,211,153,0.6)' } : undefined}
         >
           {name}
         </span>
+        {teamName && (
+          <span className="text-[10px] text-white/65 truncate flex items-center gap-1">
+            <span
+              className="inline-block w-2 h-2 rounded-full border border-white/60"
+              style={{ backgroundColor: teamColor || '#64748b' }}
+            />
+            <span>{teamName}</span>
+          </span>
+        )}
         {emoji && (
           <span className="text-lg leading-none drop-shadow-[0_0_8px_rgba(0,0,0,0.6)] animate-bounce">
             {emoji}

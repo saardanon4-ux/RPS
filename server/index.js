@@ -480,7 +480,20 @@ function transitionToPlaying(room) {
   room.players.forEach((p) => {
     if (!p.socketId) return;
     const sanitized = sanitizeGameStateForPlayer(room.gameState, p.id);
-    io.to(p.socketId).emit('game_start', { gameState: { ...sanitized, turnStartTime: room.turnStartTime }, phase: 'PLAYING' });
+    io.to(p.socketId).emit('game_start', {
+      gameState: {
+        ...sanitized,
+        turnStartTime: room.turnStartTime,
+        players: room.players.map((x) => ({
+          id: x.id,
+          name: x.name,
+          side: x.side,
+          teamName: x.teamName,
+          teamColor: x.teamColor,
+        })),
+      },
+      phase: 'PLAYING',
+    });
   });
 }
 
@@ -489,7 +502,7 @@ const rooms = new Map();
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
-  socket.on('join_room', ({ roomId, playerName, persistentPlayerId }) => {
+  socket.on('join_room', ({ roomId, playerName, persistentPlayerId, teamName, teamColor }) => {
     const rid = roomId || `room-${Date.now()}`;
     let room = rooms.get(rid);
     if (!room) {
@@ -514,18 +527,33 @@ io.on('connection', (socket) => {
       socket.emit('joined_room', {
         roomId: rid,
         playerId: pid,
-        player: { id: pid, name: player.name, side: player.side },
-        players: room.players.map((p) => ({ id: p.id, name: p.name, side: p.side })),
+        player: { id: pid, name: player.name, side: player.side, teamName: player.teamName, teamColor: player.teamColor },
+        players: room.players.map((p) => ({ id: p.id, name: p.name, side: p.side, teamName: p.teamName, teamColor: p.teamColor })),
       });
       room.players.forEach((p) => {
-        if (p.socketId) io.to(p.socketId).emit('room_updated', { roomId: rid, players: room.players.map((x) => ({ id: x.id, name: x.name, side: x.side })) });
+        if (p.socketId) io.to(p.socketId).emit('room_updated', {
+          roomId: rid,
+          players: room.players.map((x) => ({
+            id: x.id,
+            name: x.name,
+            side: x.side,
+            teamName: x.teamName,
+            teamColor: x.teamColor,
+          })),
+        });
       });
       if (room.phase === 'SETUP') {
         const gridForPlayer = room.setupGrid?.map((row) => row.map((c) => (c && c.owner === pid ? { ...c } : null))) ?? createEmptyGrid();
         socket.emit('setup_start', {
           phase: 'SETUP',
           roomId: rid,
-          players: room.players.map((x) => ({ id: x.id, name: x.name, side: x.side })),
+          players: room.players.map((x) => ({
+            id: x.id,
+            name: x.name,
+            side: x.side,
+            teamName: x.teamName,
+            teamColor: x.teamColor,
+          })),
           grid: gridForPlayer,
           setupReady: room.setupReady ?? {},
         });
@@ -560,6 +588,8 @@ io.on('connection', (socket) => {
       socketId: socket.id,
       name: playerName || `Player ${room.players.length + 1}`,
       side: room.players.length === 0 ? 'bottom' : 'top',
+      teamName: teamName || null,
+      teamColor: teamColor || null,
     };
     room.players.push(player);
 
@@ -570,11 +600,20 @@ io.on('connection', (socket) => {
     socket.emit('joined_room', {
       roomId: rid,
       playerId: pid,
-      player: { id: pid, name: player.name, side: player.side },
-      players: room.players.map((p) => ({ id: p.id, name: p.name, side: p.side })),
+      player: { id: pid, name: player.name, side: player.side, teamName: player.teamName, teamColor: player.teamColor },
+      players: room.players.map((p) => ({ id: p.id, name: p.name, side: p.side, teamName: p.teamName, teamColor: p.teamColor })),
     });
     room.players.forEach((p) => {
-      if (p.socketId) io.to(p.socketId).emit('room_updated', { roomId: rid, players: room.players.map((x) => ({ id: x.id, name: x.name, side: x.side })) });
+      if (p.socketId) io.to(p.socketId).emit('room_updated', {
+        roomId: rid,
+        players: room.players.map((x) => ({
+          id: x.id,
+          name: x.name,
+          side: x.side,
+          teamName: x.teamName,
+          teamColor: x.teamColor,
+        })),
+      });
     });
 
     if (room.players.length === 2) {
@@ -594,7 +633,13 @@ io.on('connection', (socket) => {
       socket.emit('setup_start', {
         phase: 'SETUP',
         roomId: room.roomId,
-        players: room.players.map((x) => ({ id: x.id, name: x.name, side: x.side })),
+        players: room.players.map((x) => ({
+          id: x.id,
+          name: x.name,
+          side: x.side,
+          teamName: x.teamName,
+          teamColor: x.teamColor,
+        })),
         grid: gridForPlayer,
         setupReady: room.setupReady ?? {},
       });
