@@ -210,6 +210,8 @@ function resolveTieBreaker(room) {
   room.phase = 'PLAYING';
   room.tieBreaker = null;
   room.gameState.currentTurn = room.players.find((p) => p.id !== attackerId)?.id ?? room.gameState.currentTurn;
+  room.turnStartTime = Date.now();
+  room.turnDeadline = Date.now() + TURN_TIMEOUT_SEC * 1000;
 
   let gameOver = null;
   room.players.forEach((p) => {
@@ -429,6 +431,7 @@ function executeMove(room, fromRow, fromCol, toRow, toCol, movingPlayerId) {
   if (!gameOver) {
     gs.currentTurn = room.players.find((p) => p.id !== movingPlayerId)?.id ?? gs.currentTurn;
     room.turnStartTime = Date.now();
+    room.turnDeadline = Date.now() + TURN_TIMEOUT_SEC * 1000;
     room.players.forEach((p) => {
       const mobile = countMobileUnits(grid, p.id);
       if (mobile === 0) gameOver = room.players.find((x) => x.id !== p.id)?.id ?? null;
@@ -472,17 +475,74 @@ function executeMove(room, fromRow, fromCol, toRow, toCol, movingPlayerId) {
 
 function checkTurnTimeout(room) {
   if (room.phase !== 'PLAYING' || !room.gameState || room.tieBreaker) return;
-  const elapsed = (Date.now() - (room.turnStartTime || 0)) / 1000;
-  if (elapsed < TURN_TIMEOUT_SEC) return;
+  const deadline = room.turnDeadline ?? (room.turnStartTime || 0) + TURN_TIMEOUT_SEC * 1000;
+  if (Date.now() <= deadline) return;
   const moves = getValidMovesForPlayer(room, room.gameState.currentTurn);
   if (moves.length === 0) {
-    room.gameState.currentTurn = room.players.find((p) => p.id !== room.gameState.currentTurn)?.id;
-    room.turnStartTime = Date.now();
-    emitGameState(room);
+    const otherId = room.players.find((p) => p.id !== room.gameState.currentTurn)?.id;
+    if (otherId) {
+      room.gameState.currentTurn = otherId;
+      room.phase = 'GAME_OVER';
+      room.turnStartTime = Date.now();
+      room.turnDeadline = null;
+      if (room.turnTimerInterval) {
+        clearInterval(room.turnTimerInterval);
+        room.turnTimerInterval = null;
+      }
+      room.rematchRequested = {};
+      room.lastWinnerId = otherId;
+      room.lastFlagCapture = false;
+      room.players.forEach((p) => {
+        if (!p.socketId) return;
+        io.to(p.socketId).emit('game_over', { winnerId: otherId, flagCapture: false });
+      });
+      recordGameResultForRoom(room, otherId);
+    } else {
+      room.turnStartTime = Date.now();
+      room.turnDeadline = Date.now() + TURN_TIMEOUT_SEC * 1000;
+      emitGameState(room);
+    }
     return;
   }
   const [fr, fc, tr, tc] = moves[Math.floor(Math.random() * moves.length)];
   executeMove(room, fr, fc, tr, tc, room.gameState.currentTurn);
+}
+
+function checkExpiredTurns() {
+  for (const room of rooms.values()) {
+    if (room.phase !== 'PLAYING' || !room.gameState || room.tieBreaker) continue;
+    const deadline = room.turnDeadline ?? (room.turnStartTime || 0) + TURN_TIMEOUT_SEC * 1000;
+    if (Date.now() <= deadline) continue;
+    const moves = getValidMovesForPlayer(room, room.gameState.currentTurn);
+    if (moves.length === 0) {
+      const otherId = room.players.find((p) => p.id !== room.gameState.currentTurn)?.id;
+      if (otherId) {
+        room.gameState.currentTurn = otherId;
+        room.phase = 'GAME_OVER';
+        room.turnStartTime = Date.now();
+        room.turnDeadline = null;
+        if (room.turnTimerInterval) {
+          clearInterval(room.turnTimerInterval);
+          room.turnTimerInterval = null;
+        }
+        room.rematchRequested = {};
+        room.lastWinnerId = otherId;
+        room.lastFlagCapture = false;
+        room.players.forEach((p) => {
+          if (!p.socketId) return;
+          io.to(p.socketId).emit('game_over', { winnerId: otherId, flagCapture: false });
+        });
+        recordGameResultForRoom(room, otherId);
+      } else {
+        room.turnStartTime = Date.now();
+        room.turnDeadline = Date.now() + TURN_TIMEOUT_SEC * 1000;
+        emitGameState(room);
+      }
+      continue;
+    }
+    const [fr, fc, tr, tc] = moves[Math.floor(Math.random() * moves.length)];
+    executeMove(room, fr, fc, tr, tc, room.gameState.currentTurn);
+  }
 }
 
 function transitionToPlaying(room) {
@@ -493,6 +553,7 @@ function transitionToPlaying(room) {
   room.phase = 'PLAYING';
   room.gameState = buildGameStateFromSetup(room);
   room.turnStartTime = Date.now();
+  room.turnDeadline = Date.now() + TURN_TIMEOUT_SEC * 1000;
   if (room.turnTimerInterval) clearInterval(room.turnTimerInterval);
   room.turnTimerInterval = setInterval(() => {
     const r = rooms.get(room.roomId);
@@ -519,6 +580,10 @@ function transitionToPlaying(room) {
 }
 
 const rooms = new Map();
+
+setInterval(() => {
+  checkExpiredTurns();
+}, 1000);
 
 async function recordGameResultForRoom(room, winnerId = null, explicitPlayerIds = null) {
   try {
@@ -1194,6 +1259,43 @@ app.get('/api/rooms/active', (req, res) => {
   } catch (err) {
     console.error('Error listing active rooms', err);
     res.status(500).json({ error: 'Failed to load active rooms' });
+  }
+});
+
+app.get('/api/stats/players', async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        username: true,
+        wins: true,
+        losses: true,
+        group: { select: { name: true, color: true } },
+      },
+      orderBy: { wins: 'desc' },
+    });
+
+    const enriched = users
+      .map((u) => {
+        const games = u.wins + u.losses;
+        const winPercentage = games > 0 ? Number(((u.wins / games) * 100).toFixed(2)) : 0;
+        return {
+          id: u.id,
+          username: u.username,
+          groupName: u.group?.name ?? null,
+          groupColor: u.group?.color ?? null,
+          wins: u.wins,
+          losses: u.losses,
+          games,
+          winPercentage,
+        };
+      })
+      .filter((u) => u.games > 0);
+
+    res.json(enriched);
+  } catch (err) {
+    console.error('Error building player stats', err);
+    res.status(500).json({ error: 'Failed to load player stats' });
   }
 });
 

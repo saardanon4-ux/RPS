@@ -22,6 +22,49 @@ function getUnitImagePath(unit) {
   return UNIT_IMAGE_MAP[unit.type] ?? '/assets/unit-hidden.png';
 }
 
+/** Base asset is red; map team color (hex) to hue-rotate so shirt matches. Only use for revealed piece images. */
+function getTeamFilter(teamColor) {
+  if (!teamColor) return 'none';
+  const hex = String(teamColor).replace(/^#/, '');
+  if (hex.length !== 6) return 'none';
+  const r = parseInt(hex.slice(0, 2), 16) / 255;
+  const g = parseInt(hex.slice(2, 4), 16) / 255;
+  const b = parseInt(hex.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  if (max !== min) {
+    const d = max - min;
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+    else if (max === g) h = ((b - r) / d + 2) / 6;
+    else h = ((r - g) / d + 4) / 6;
+  }
+  const hue = Math.round(h * 360);
+  if (hue <= 15 || hue >= 345) return 'none';
+  return `hue-rotate(${hue}deg)`;
+}
+
+/** Normalize hex for comparison (e.g. #ef4444 vs ef4444). */
+function normalizeHex(color) {
+  if (!color) return '';
+  return String(color).replace(/^#/, '').toLowerCase().padEnd(6, '0').slice(0, 6);
+}
+
+/** Away kit filter when both teams have the same color: silver/white so opponent stays distinct. */
+const AWAY_KIT_FILTER = 'grayscale(100%) brightness(150%)';
+
+/** Display color for opponent's glow when in color-clash (away kit). */
+const AWAY_KIT_GLOW = '#c0c0c0';
+
+/**
+ * CSS filter for a piece image. Player always uses their team color; opponent uses away kit when colors clash.
+ */
+function getPieceFilter(isMyUnit, teamColor, isColorClash) {
+  if (isMyUnit) return getTeamFilter(teamColor);
+  if (isColorClash) return AWAY_KIT_FILTER;
+  return getTeamFilter(teamColor);
+}
+
 const IMMOBILE_TYPES = ['flag', 'trap'];
 
 const TILE_BASE =
@@ -104,6 +147,7 @@ export default function Board() {
   const opponent = players.find((p) => p.id !== playerId);
   const myColor = me?.teamColor || '#22c55e';
   const opponentColor = opponent?.teamColor || '#ef4444';
+  const isColorClash = normalizeHex(myColor) === normalizeHex(opponentColor);
 
   return (
     <div className="relative flex flex-col items-center gap-4">
@@ -157,14 +201,16 @@ export default function Board() {
               const isHidden = cell?.type === 'hidden';
 
               const unitColor = isMyUnit ? myColor : opponentColor;
+              const displayColor = isMyUnit ? myColor : (isColorClash ? AWAY_KIT_GLOW : opponentColor);
+              const pieceFilter = getPieceFilter(isMyUnit, unitColor, isColorClash);
 
               const imgProps = {
                 src: imagePath,
                 alt: cell?.type === 'hidden' ? 'Unknown unit' : cell?.type ?? 'Unit',
                 className: 'w-full h-full object-contain',
                 style: {
-                  filter: isHidden ? 'brightness(1)' : 'none',
-                  boxShadow: `0 0 12px ${unitColor}aa`,
+                  filter: isHidden ? 'brightness(1)' : pieceFilter,
+                  boxShadow: `0 0 12px ${displayColor}aa`,
                 },
               };
 

@@ -121,10 +121,6 @@ export default function PlayerStatsPanel() {
               <p className="font-semibold text-red-300">{stats.losses}</p>
             </div>
             <div>
-              <p className="text-white/60 text-[11px]">תיקו</p>
-              <p className="font-semibold text-amber-200">{stats.draws}</p>
-            </div>
-            <div>
               <p className="text-white/60 text-[11px]">אחוז ניצחונות</p>
               <p className="font-semibold">{winRateLabel}</p>
             </div>
@@ -149,7 +145,7 @@ export default function PlayerStatsPanel() {
                       <th className="py-2 pr-2 font-semibold">שחקן</th>
                       <th className="py-2 font-semibold">קבוצה</th>
                       <th className="py-2 font-semibold">משחקים</th>
-                      <th className="py-2 font-semibold">מאזן (נ/ה/ת)</th>
+                      <th className="py-2 font-semibold">מאזן (נ/ה)</th>
                       <th className="py-2 font-semibold">אחוז ניצחונות</th>
                     </tr>
                   </thead>
@@ -175,7 +171,7 @@ export default function PlayerStatsPanel() {
                         </td>
                         <td className="py-1.5 text-center">{row.games}</td>
                         <td className="py-1.5 text-center">
-                          {row.wins}/{row.losses}/{row.draws}
+                          {row.wins}/{row.losses}
                         </td>
                         <td className="py-1.5 text-center">
                           {row.winPercentage != null ? `${row.winPercentage.toFixed(2)}%` : '0%'}
