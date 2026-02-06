@@ -38,7 +38,7 @@ export default function WelcomeScreen() {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 overflow-hidden relative">
+    <div className="min-h-screen w-full flex items-center justify-center p-4 relative">
       {/* Animated gradient background */}
       <div
         className="absolute inset-0 -z-10"
@@ -77,7 +77,7 @@ export default function WelcomeScreen() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.1 }}
           >
-            STRATEGO BATTLE
+            אחסן, נייר ומספריים
           </motion.h1>
           <motion.p
             className="text-center text-white/60 text-sm mb-8"
@@ -85,7 +85,7 @@ export default function WelcomeScreen() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
           >
-            אחסן, נייר ומספריים
+            STRATEGO BATTLE
           </motion.p>
 
           <form onSubmit={handleJoin} className="space-y-5">
