@@ -77,7 +77,7 @@ export default function WelcomeScreen() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.1 }}
           >
-            אחסן, נייר ומספריים
+            אחסן,נייר ומספריים
           </motion.h1>
           <motion.p
             className="text-center text-white/60 text-sm mb-8"
@@ -104,7 +104,11 @@ export default function WelcomeScreen() {
                 autoComplete="off"
                 value={inputRoomId}
                 onChange={(e) => setInputRoomId(e.target.value)}
-                onFocus={() => setFocusedField('room')}
+                onClick={(e) => e.currentTarget.focus()}
+                onFocus={() => {
+                  setFocusedField('room');
+                  window.scrollTo(0, 0);
+                }}
                 onBlur={() => setFocusedField(null)}
                 placeholder="abc123 or leave empty for new"
                 className={`w-full px-4 py-3.5 rounded-xl bg-white/5 border-2 text-white placeholder-white/40 outline-none transition-all duration-300 ${
@@ -112,6 +116,7 @@ export default function WelcomeScreen() {
                     ? 'border-amber-400/80 shadow-[0_0_20px_rgba(251,191,36,0.3)]'
                     : 'border-white/20 hover:border-white/30'
                 }`}
+                style={{ cursor: 'text', touchAction: 'manipulation' }}
               />
             </motion.div>
 
@@ -130,7 +135,11 @@ export default function WelcomeScreen() {
                 autoComplete="off"
                 value={inputName}
                 onChange={(e) => setInputName(e.target.value)}
-                onFocus={() => setFocusedField('name')}
+                onClick={(e) => e.currentTarget.focus()}
+                onFocus={() => {
+                  setFocusedField('name');
+                  window.scrollTo(0, 0);
+                }}
                 onBlur={() => setFocusedField(null)}
                 placeholder="Your nickname"
                 className={`w-full px-4 py-3.5 rounded-xl bg-white/5 border-2 text-white placeholder-white/40 outline-none transition-all duration-300 ${
@@ -138,6 +147,7 @@ export default function WelcomeScreen() {
                     ? 'border-amber-400/80 shadow-[0_0_20px_rgba(251,191,36,0.3)]'
                     : 'border-white/20 hover:border-white/30'
                 }`}
+                style={{ cursor: 'text', touchAction: 'manipulation' }}
               />
             </motion.div>
 
