@@ -1,0 +1,43 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Group {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  users User[]
+}
+
+model User {
+  id            Int     @id @default(autoincrement())
+  username      String  @unique
+  password      String
+  groupId       Int?
+  group         Group?  @relation(fields: [groupId], references: [id])
+  gamesAsPlayerA Game[] @relation("gamesAsPlayerA")
+  gamesAsPlayerB Game[] @relation("gamesAsPlayerB")
+  gamesWon       Game[] @relation("gamesWon")
+}
+
+model Game {
+  id        Int      @id @default(autoincrement())
+  playerAId Int
+  playerBId Int
+  winnerId  Int?
+  createdAt DateTime @default(now())
+
+  playerA User @relation("gamesAsPlayerA", fields: [playerAId], references: [id])
+  playerB User @relation("gamesAsPlayerB", fields: [playerBId], references: [id])
+  winner  User? @relation("gamesWon", fields: [winnerId], references: [id])
+}

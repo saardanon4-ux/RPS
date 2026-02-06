@@ -3,6 +3,7 @@ import Board from './components/Board';
 import WelcomeScreen from './components/WelcomeScreen';
 import GameHUD from './components/GameHUD';
 import SetupBoard from './components/SetupBoard';
+import HowToPlayModal from './components/HowToPlayModal';
 import { useGame } from './context/GameContext';
 
 const EMOJI_OPTIONS = ['🤫', '✂️', '🧠', '💣', '😂', '😈'];
@@ -48,6 +49,7 @@ export default function App() {
 
   const [turnRemaining, setTurnRemaining] = useState(30);
   const turnStartTime = gameState?.turnStartTime;
+  const [showHowTo, setShowHowTo] = useState(false);
   useEffect(() => {
     if (!turnStartTime) return;
     const tick = () => {
@@ -104,10 +106,23 @@ export default function App() {
       )}
 
       <header className="flex flex-col items-center gap-2 px-4 py-2 shrink-0">
-        <div className="flex items-center justify-between w-full">
-          <h1 className="text-xl font-bold tracking-tight text-white/90 shrink-0" style={{ fontFamily: "'Orbitron', sans-serif" }}>
-            RPS STRATEGO
-          </h1>
+        <div className="flex items-center justify-between w-full gap-3">
+          <div className="flex items-center gap-3 shrink-0">
+            <h1
+              className="text-xl font-bold tracking-tight text-white/90"
+              style={{ fontFamily: "'Orbitron', sans-serif" }}
+            >
+              RPS STRATEGO
+            </h1>
+            <button
+              type="button"
+              onClick={() => setShowHowTo(true)}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/20 text-xs font-semibold text-white/90 shadow-sm"
+            >
+              <span className="text-amber-300 text-base">?</span>
+              <span className="whitespace-nowrap">איך משחקים? / How to play</span>
+            </button>
+          </div>
           <div className="flex-1 flex justify-end min-w-0">
             <WelcomeScreen />
           </div>
@@ -132,6 +147,8 @@ export default function App() {
           {setupPhase ? <SetupBoard /> : <Board />}
         </main>
       </div>
+
+      <HowToPlayModal open={showHowTo} onClose={() => setShowHowTo(false)} />
     </div>
   );
 }

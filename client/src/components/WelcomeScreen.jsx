@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../context/GameContext';
+import HowToPlayModal from './HowToPlayModal';
 
 export default function WelcomeScreen() {
   const { connected, roomId, player, players, error, joinRoom, leaveRoom } = useGame();
   const [inputRoomId, setInputRoomId] = useState('');
   const [inputName, setInputName] = useState('');
   const [focusedField, setFocusedField] = useState(null);
+  const [showHowTo, setShowHowTo] = useState(false);
 
   const handleJoin = (e) => {
     e.preventDefault();
@@ -67,9 +69,16 @@ export default function WelcomeScreen() {
         transition={{ duration: 0.5 }}
       >
         <div
-          className="rounded-3xl p-8 sm:p-10 backdrop-blur-xl bg-white/10 border border-white/20 shadow-2xl shadow-purple-900/20"
+          className="rounded-3xl p-8 sm:p-10 backdrop-blur-xl bg-white/10 border border-white/20 shadow-2xl shadow-purple-900/20 relative"
           style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)' }}
         >
+          <button
+            type="button"
+            onClick={() => setShowHowTo(true)}
+            className="absolute -top-3 -right-3 px-3 py-1.5 rounded-full bg-amber-400 text-slate-900 text-xs font-semibold shadow-lg hover:bg-amber-300 transition-colors"
+          >
+            איך משחקים?
+          </button>
           <motion.h1
             className="text-3xl sm:text-4xl font-black text-center mb-2 tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-orange-400"
             style={{ fontFamily: "'Orbitron', sans-serif" }}
@@ -181,6 +190,8 @@ export default function WelcomeScreen() {
           50% { background-position: 100% 50%; }
         }
       `}</style>
+
+      <HowToPlayModal open={showHowTo} onClose={() => setShowHowTo(false)} />
     </div>
   );
 }
