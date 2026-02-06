@@ -153,7 +153,7 @@ function getAnimationVariant(winnerMove, loserMove, unitType, isAttacker) {
   return null;
 }
 
-export default function CombatModal({ combatState, playerId, onComplete }) {
+export default function CombatModal({ combatState, playerId, isPlayer2, onComplete }) {
   const [phase, setPhase] = useState('approach');
 
   useEffect(() => {
@@ -171,14 +171,18 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
 
   if (!combatState) return null;
 
-  const { attackerType, defenderType, result } = combatState;
+  const { attackerType, defenderType, result, fromRow, fromCol, toRow, toCol } = combatState;
   const attackerEmoji = UNIT_EMOJI[attackerType] ?? '?';
   const defenderEmoji = UNIT_EMOJI[defenderType] ?? '?';
+  const combatKey = `${attackerType}-${defenderType}-${result}-${combatState.attackerId}-${fromRow}-${fromCol}-${toRow}-${toCol}`;
 
   const attackerWins = result === 'attacker_wins';
   const defenderWins = result === 'defender_wins';
   const bothDestroyed = result === 'both_destroyed';
   const isTrap = result === 'trap_kills';
+
+  const leftLabel = combatState.attackerId === playerId ? 'Your unit' : 'Opponent';
+  const rightLabel = combatState.attackerId === playerId ? 'Opponent' : 'Your unit';
 
   const resultLabel = getResultLabel(result, combatState.attackerId, playerId, attackerType, defenderType);
 
@@ -194,10 +198,9 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
   const showScissorsFragments = rockSmashesScissors && phase === 'impact';
   const showPaperPieces = scissorsCutsPaper && phase === 'impact';
 
-
-  return (
+  const content = (
     <motion.div
-      className="absolute inset-0 z-20 flex items-center justify-center rounded-lg overflow-hidden"
+      className="absolute inset-0 z-30 flex items-center justify-center rounded-lg overflow-hidden"
       style={{ backdropFilter: 'blur(10px)', backgroundColor: 'rgba(0,0,0,0.65)' }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -217,12 +220,11 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
         >
           {isTrap ? 'Caught in a trap!' : 'Combat!'}
         </motion.p>
-
         <div className="flex items-center gap-4 relative min-h-[140px] w-[280px] justify-center">
           {showScissorsFragments && <ScissorsFragments visible />}
           {showPaperPieces && <PaperPieces visible />}
 
-          {/* Attacker - left side */}
+          {/* Left side (attacker) */}
           <motion.div
             className={`flex flex-col items-center gap-2 relative ${paperCoversRock && attackerType === 'paper' ? 'z-[50]' : 'z-10'}`}
             initial={{ x: -100, opacity: 0 }}
@@ -234,6 +236,7 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
             transition={phase === 'approach' ? { type: 'spring', stiffness: 120, damping: 18 } : {}}
           >
             <motion.span
+              key={`att-${combatKey}`}
               className="block text-5xl sm:text-6xl"
               role="img"
               aria-label={attackerType}
@@ -254,7 +257,7 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
             >
               {attackerEmoji}
             </motion.span>
-            <span className="text-xs text-stone-400">Attacker</span>
+            <span className="text-xs text-stone-400 font-medium">{leftLabel}</span>
           </motion.div>
 
           {(phase === 'approach' || phase === 'clash') && (
@@ -300,6 +303,7 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
               </motion.div>
             )}
             <motion.span
+              key={`def-${combatKey}`}
               className="block text-5xl sm:text-6xl relative"
               role="img"
               aria-label={defenderType}
@@ -320,8 +324,8 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
             >
               {defenderEmoji}
             </motion.span>
-            <span className="text-xs text-stone-400">
-              {defenderType === 'trap' ? 'Trap!' : 'Defender'}
+            <span className="text-xs text-stone-400 font-medium">
+              {defenderType === 'trap' ? 'Trap!' : rightLabel}
             </span>
           </motion.div>
         </div>
@@ -346,4 +350,13 @@ export default function CombatModal({ combatState, playerId, onComplete }) {
       </motion.div>
     </motion.div>
   );
+
+  if (isPlayer2) {
+    return (
+      <div className="absolute inset-0 z-30 flex items-center justify-center" style={{ transform: 'rotate(180deg)' }}>
+        {content}
+      </div>
+    );
+  }
+  return content;
 }

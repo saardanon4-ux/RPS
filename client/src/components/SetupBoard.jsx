@@ -98,7 +98,7 @@ export default function SetupBoard() {
 
   return (
     <div className="flex flex-col items-center gap-4 w-full max-w-lg">
-      <p className="text-sm text-white/70">
+      <p className="text-sm text-stone-800 dark:text-white/80">
         {setupTimer !== null ? `${setupTimer}s left` : 'Setup'}
       </p>
 
@@ -148,7 +148,7 @@ export default function SetupBoard() {
 
       {/* Unit Palette */}
       <div className="w-full">
-        <p className="text-sm text-white/60 mb-2 text-center">
+        <p className="text-sm text-stone-800 dark:text-white/70 mb-2 text-center">
           Select type, then click a slot. Click placed unit to remove.
         </p>
         <div className="flex flex-wrap gap-2 justify-center">
@@ -177,7 +177,7 @@ export default function SetupBoard() {
                 }`}
               >
                 <span className="text-2xl">{emoji}</span>
-                <span className="text-xs text-white/60">
+                <span className="text-xs text-stone-800 dark:text-white/70">
                   {label}
                   {limit !== null ? ` (${count}/${limit})` : ` (${count})`}
                 </span>
@@ -206,7 +206,7 @@ export default function SetupBoard() {
       </div>
 
       {setupReady && Object.keys(setupReady).length > 0 && (
-        <p className="text-sm text-white/70">
+        <p className="text-sm text-stone-800 dark:text-white/70">
           Ready: {Object.entries(setupReady).filter(([, r]) => r).length}/2
         </p>
       )}

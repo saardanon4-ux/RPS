@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 
@@ -13,20 +13,45 @@ const LOSE_LABELS = {
   no_units: { title: 'All your units were destroyed', sub: '😔 You Lose', icon: '💥' },
 };
 
-export default function FlagCaptureCelebration({ won, winType = 'flag', onComplete, rematchRequested, requestRematch, playerId }) {
+function wrapForPlayer2(content, isPlayer2) {
+  if (!isPlayer2) return content;
+  return (
+    <div className="absolute inset-0 z-30 flex items-center justify-center" style={{ transform: 'rotate(180deg)' }}>
+      {content}
+    </div>
+  );
+}
+
+export default function FlagCaptureCelebration({ won, winType = 'flag', onComplete, rematchRequested, requestRematch, playerId, isPlayer2, disconnectWin, opponentConnected }) {
   const iRequested = rematchRequested?.[playerId];
   const otherRequested = Object.keys(rematchRequested ?? {}).some((id) => id !== playerId && rematchRequested[id]);
   const bothReady = iRequested && otherRequested;
-  const [showVideo, setShowVideo] = useState(won && winType === 'flag');
+  const [showVideo, setShowVideo] = useState(won);
+  const videoRef = useRef(null);
 
   useEffect(() => {
-    if (won && winType === 'flag') {
+    if (won) {
       setShowVideo(true);
       const t = setTimeout(() => setShowVideo(false), VIDEO_DURATION_MS);
       return () => clearTimeout(t);
     }
-    if (won && winType === 'no_units') setShowVideo(false);
-  }, [won, winType]);
+  }, [won]);
+
+  // Force play in browsers that show first frame only.
+  useEffect(() => {
+    if (!showVideo) return;
+    const v = videoRef.current;
+    if (!v) return;
+    const tryPlay = async () => {
+      try {
+        v.muted = true;
+        await v.play();
+      } catch {
+        // ignore autoplay blocks; user still sees the video container
+      }
+    };
+    tryPlay();
+  }, [showVideo]);
 
   useEffect(() => {
     if (won) {
@@ -60,7 +85,7 @@ export default function FlagCaptureCelebration({ won, winType = 'flag', onComple
   }, [onComplete]);
 
   if (won) {
-    return (
+    const winContent = (
       <motion.div
         className="absolute inset-0 z-30 flex flex-col items-center justify-center rounded-lg overflow-hidden touch-manipulation"
         style={{ backdropFilter: 'blur(8px)', backgroundColor: 'rgba(0,0,0,0.4)' }}
@@ -69,7 +94,7 @@ export default function FlagCaptureCelebration({ won, winType = 'flag', onComple
         exit={{ opacity: 0 }}
       >
         <AnimatePresence mode="wait">
-          {showVideo && winType === 'flag' ? (
+          {showVideo ? (
             <motion.div
               key="video"
               className="flex items-center justify-center w-full max-w-md aspect-video pointer-events-none"
@@ -79,11 +104,13 @@ export default function FlagCaptureCelebration({ won, winType = 'flag', onComple
               transition={{ duration: 0.3 }}
             >
               <video
+                ref={videoRef}
                 src="/assets/capture_flag.mp4"
                 autoPlay
                 muted
-                loop={false}
+                loop
                 playsInline
+                preload="auto"
                 className="w-full h-full object-contain"
               />
             </motion.div>
@@ -125,22 +152,25 @@ export default function FlagCaptureCelebration({ won, winType = 'flag', onComple
           >
             🎉🎊🥳🎉🎊
           </motion.div>
-          <button
-            type="button"
-            onClick={requestRematch}
-            disabled={iRequested}
-            className="mt-6 w-full min-h-[48px] px-4 py-3 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-amber-600 disabled:cursor-default text-white font-medium transition-colors touch-manipulation active:scale-[0.98]"
-          >
-            {bothReady ? 'Starting rematch...' : iRequested ? 'Waiting for opponent...' : 'Rematch'}
-          </button>
+          {!disconnectWin && opponentConnected && (
+            <button
+              type="button"
+              onClick={requestRematch}
+              disabled={iRequested}
+              className="mt-6 w-full min-h-[48px] px-4 py-3 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-amber-600 disabled:cursor-default text-white font-medium transition-colors touch-manipulation active:scale-[0.98]"
+            >
+              {bothReady ? 'Starting rematch...' : iRequested ? 'Waiting for opponent...' : 'Rematch'}
+            </button>
+          )}
             </motion.div>
           )}
         </AnimatePresence>
       </motion.div>
     );
+    return wrapForPlayer2(winContent, isPlayer2);
   }
 
-  return (
+  const loseContent = (
     <motion.div
       className="absolute inset-0 z-30 flex items-center justify-center rounded-lg overflow-hidden touch-manipulation"
       style={{ backdropFilter: 'blur(8px)', backgroundColor: 'rgba(0,0,0,0.5)' }}
@@ -159,15 +189,18 @@ export default function FlagCaptureCelebration({ won, winType = 'flag', onComple
         </motion.p>
         <p className="text-xl font-bold text-stone-400">{LOSE_LABELS[winType]?.title ?? LOSE_LABELS.flag.title}</p>
         <p className="text-2xl font-black text-red-500 mt-2">{LOSE_LABELS[winType]?.sub ?? LOSE_LABELS.flag.sub}</p>
-        <button
-          type="button"
-          onClick={requestRematch}
-          disabled={iRequested}
-          className="mt-6 w-full min-h-[48px] px-4 py-3 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-amber-600 disabled:cursor-default text-white font-medium transition-colors touch-manipulation active:scale-[0.98]"
-        >
-          {bothReady ? 'Starting rematch...' : iRequested ? 'Waiting for opponent...' : 'Rematch'}
-        </button>
+        {!disconnectWin && opponentConnected && (
+          <button
+            type="button"
+            onClick={requestRematch}
+            disabled={iRequested}
+            className="mt-6 w-full min-h-[48px] px-4 py-3 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-amber-600 disabled:cursor-default text-white font-medium transition-colors touch-manipulation active:scale-[0.98]"
+          >
+            {bothReady ? 'Starting rematch...' : iRequested ? 'Waiting for opponent...' : 'Rematch'}
+          </button>
+        )}
       </motion.div>
     </motion.div>
   );
+  return wrapForPlayer2(loseContent, isPlayer2);
 }

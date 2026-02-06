@@ -15,6 +15,9 @@ export function GameProvider({ children }) {
   const [gameState, setGameState] = useState(null);
   const [gameOver, setGameOver] = useState(null);
   const [combatState, setCombatState] = useState(null);
+  const [combatPending, setCombatPending] = useState(null);
+  const [tiePending, setTiePending] = useState(null);
+  const [lastTieCombat, setLastTieCombat] = useState(null);
   const [pendingGameState, setPendingGameState] = useState(null);
   const [tieBreakerState, setTieBreakerState] = useState(null);
   const [phase, setPhase] = useState('WAITING');
@@ -27,6 +30,9 @@ export function GameProvider({ children }) {
   const [error, setError] = useState(null);
   const stateRef = useRef({ roomId: '', player: null });
   stateRef.current = { roomId, player };
+  // CRITICAL UI lock: prevents re-triggering animations due to duplicate/overlapping events.
+  const isAnimatingRef = useRef(false);
+  const preBattleTimeoutRef = useRef(null);
 
   useEffect(() => {
     const s = io(SOCKET_URL, {
@@ -41,7 +47,7 @@ export function GameProvider({ children }) {
     let reconnectRoomId = null;
     let reconnectPlayerName = null;
 
-    s.on('connect', () => {
+    const onConnect = () => {
       setConnected(true);
       setError(null);
       if (reconnectRoomId) {
@@ -58,32 +64,32 @@ export function GameProvider({ children }) {
         });
         reconnectPlayerName = null;
       }
-    });
+    };
 
-    s.on('disconnect', () => {
+    const onDisconnect = () => {
       setConnected(false);
       reconnectRoomId = stateRef.current.roomId;
       reconnectPlayerName = stateRef.current.player?.name;
-    });
+    };
 
-    s.on('joined_room', ({ roomId: rid, playerId: pid, player: p, players: pl }) => {
+    const onJoinedRoom = ({ roomId: rid, playerId: pid, player: p, players: pl }) => {
       setRoomId(rid);
       setPlayerId(pid);
       setPlayer(p);
       setPlayers(pl);
       setGameState(null); // cleared until game_start
       setError(null);
-    });
+    };
 
-    s.on('room_full', () => {
+    const onRoomFull = () => {
       setError('Room is full');
-    });
+    };
 
-    s.on('room_updated', ({ players: pl }) => {
+    const onRoomUpdated = ({ players: pl }) => {
       setPlayers(pl);
-    });
+    };
 
-    s.on('setup_start', ({ grid, setupReady: sr, roomId: rid, players: pl }) => {
+    const onSetupStart = ({ grid, setupReady: sr, roomId: rid, players: pl }) => {
       setPhase('SETUP');
       setSetupPhase(true);
       setSetupGrid(grid);
@@ -93,18 +99,18 @@ export function GameProvider({ children }) {
       setRematchRequested({});
       if (rid) setRoomId(rid);
       if (pl && Array.isArray(pl)) setPlayers(pl);
-    });
+    };
 
-    s.on('setup_update', ({ grid, setupReady: sr }) => {
+    const onSetupUpdate = ({ grid, setupReady: sr }) => {
       setSetupGrid(grid);
       setSetupReady(sr ?? {});
-    });
+    };
 
-    s.on('setup_timer', ({ remaining }) => {
+    const onSetupTimer = ({ remaining }) => {
       setSetupTimer(remaining);
-    });
+    };
 
-    s.on('game_start', ({ gameState: gs }) => {
+    const onGameStart = ({ gameState: gs }) => {
       setPhase('PLAYING');
       setSetupPhase(false);
       setSetupGrid(null);
@@ -112,63 +118,152 @@ export function GameProvider({ children }) {
       setGameState(gs);
       setGameOver(null);
       setCombatState(null);
+      setCombatPending(null);
+      setTiePending(null);
       setPendingGameState(null);
       setTieBreakerState(null);
-    });
+      isAnimatingRef.current = false;
+      if (preBattleTimeoutRef.current) clearTimeout(preBattleTimeoutRef.current);
+      preBattleTimeoutRef.current = null;
+    };
 
-    s.on('game_state_update', ({ gameState: gs }) => {
+    const onGameStateUpdate = ({ gameState: gs }) => {
       setGameState(gs);
-    });
+    };
 
-    s.on('combat_event', ({ attackerType, defenderType, result, attackerId, fromRow, fromCol, toRow, toCol, newGameState }) => {
-      setCombatState({ attackerType, defenderType, result, attackerId, fromRow, fromCol, toRow, toCol });
+    const PRE_BATTLE_DELAY_MS = 900;
+
+    const onCombatEvent = ({ battleId, attackerType, defenderType, result, attackerId, fromRow, fromCol, toRow, toCol, newGameState }) => {
+      if (isAnimatingRef.current) return; // DROP overlapping animation events
+      isAnimatingRef.current = true;
+      if (preBattleTimeoutRef.current) clearTimeout(preBattleTimeoutRef.current);
+      preBattleTimeoutRef.current = null;
+      // Clean slate so old state can't confuse AnimatePresence.
+      setCombatState(null);
+      setCombatPending(null);
+      const payload = { battleId, attackerType, defenderType, result, attackerId, fromRow, fromCol, toRow, toCol };
       setPendingGameState(newGameState ?? null);
-    });
+      setCombatPending(payload);
+      preBattleTimeoutRef.current = setTimeout(() => {
+        setCombatState(payload);
+        setCombatPending(null);
+        preBattleTimeoutRef.current = null;
+      }, PRE_BATTLE_DELAY_MS);
+    };
 
-    s.on('tie_break_start', ({ deadline, unitType, fromRow, fromCol, toRow, toCol }) => {
-      setTieBreakerState({ deadline, unitType, isRestart: false, fromRow, fromCol, toRow, toCol });
-    });
+    const onTieBreakStart = ({ battleId, deadline, unitType, fromRow, fromCol, toRow, toCol }) => {
+      // Highlight the battle square first, then open Sudden Death.
+      const pending = { battleId, deadline, unitType, isRestart: false, fromRow, fromCol, toRow, toCol };
+      setTiePending(pending);
+      setTimeout(() => {
+        setTieBreakerState(pending);
+        setTiePending(null);
+      }, PRE_BATTLE_DELAY_MS);
+    };
 
-    s.on('tie_break_tie', ({ combatResult, attackerId, fromRow, fromCol, toRow, toCol, newGameState }) => {
-      setCombatState({
+    const onTieBreakTie = ({ battleId, combatResult, attackerId, fromRow, fromCol, toRow, toCol, newGameState }) => {
+      const payload = {
+        battleId,
         attackerType: combatResult.attackerType,
         defenderType: combatResult.defenderType,
         result: combatResult.result,
         attackerId,
         fromRow, fromCol, toRow, toCol,
-      });
-      setPendingGameState(newGameState ?? null);
-    });
+      };
+      // Apply game state immediately and just remember the last tie combat for Sudden Death UI.
+      if (newGameState) {
+        setGameState(newGameState);
+        setPendingGameState(null);
+      } else {
+        setPendingGameState(null);
+      }
+      setLastTieCombat(payload);
+      // IMPORTANT: do NOT trigger CombatModal here – we want to go straight back to selection.
+      isAnimatingRef.current = false;
+    };
 
-    s.on('tie_break_restart', ({ deadline, timeout, fromRow, fromCol, toRow, toCol }) => {
-      setTieBreakerState((prev) => ({ ...prev, deadline, isRestart: true, wasTimeout: !!timeout, fromRow, fromCol, toRow, toCol }));
-    });
+    const onTieBreakRestart = ({ battleId, deadline, timeout, fromRow, fromCol, toRow, toCol }) => {
+      setTieBreakerState((prev) => ({ ...prev, battleId, deadline, isRestart: true, wasTimeout: !!timeout, fromRow, fromCol, toRow, toCol }));
+    };
 
-    s.on('tie_break_resolved', ({ combatResult, attackerId, fromRow, fromCol, toRow, toCol, newGameState }) => {
+    const onTieBreakResolved = ({ battleId, combatResult, attackerId, fromRow, fromCol, toRow, toCol, newGameState }) => {
+      if (isAnimatingRef.current) return; // DROP overlapping animation events
+      isAnimatingRef.current = true;
+      if (preBattleTimeoutRef.current) clearTimeout(preBattleTimeoutRef.current);
+      preBattleTimeoutRef.current = null;
       setTieBreakerState(null);
-      setCombatState({
+      setCombatState(null);
+      setCombatPending(null);
+      const payload = {
+        battleId,
         attackerType: combatResult.attackerType,
         defenderType: combatResult.defenderType,
         result: combatResult.result,
         attackerId,
         fromRow, fromCol, toRow, toCol,
-      });
+      };
       setPendingGameState(newGameState ?? null);
-    });
+      setCombatPending(payload);
+      preBattleTimeoutRef.current = setTimeout(() => {
+        setCombatState(payload);
+        setCombatPending(null);
+        preBattleTimeoutRef.current = null;
+      }, PRE_BATTLE_DELAY_MS);
+    };
 
 
-    s.on('game_over', ({ winnerId, flagCapture }) => {
-      setGameOver({ winnerId, flagCapture: !!flagCapture });
+    const onGameOver = ({ winnerId, flagCapture, disconnectWin }) => {
+      setGameOver({ winnerId, flagCapture: !!flagCapture, disconnectWin: !!disconnectWin });
       setTieBreakerState(null);
       setRematchRequested({});
-    });
+    };
 
-    s.on('rematch_update', ({ rematchRequested: rr }) => {
+    const onRematchUpdate = ({ rematchRequested: rr }) => {
       setRematchRequested(rr ?? {});
-    });
+    };
+
+    s.on('connect', onConnect);
+    s.on('disconnect', onDisconnect);
+    s.on('joined_room', onJoinedRoom);
+    s.on('room_full', onRoomFull);
+    s.on('room_updated', onRoomUpdated);
+    s.on('setup_start', onSetupStart);
+    s.on('setup_update', onSetupUpdate);
+    s.on('setup_timer', onSetupTimer);
+    s.on('game_start', onGameStart);
+    s.on('game_state_update', onGameStateUpdate);
+    s.on('combat_event', onCombatEvent);
+    s.on('tie_break_start', onTieBreakStart);
+    s.on('tie_break_tie', onTieBreakTie);
+    s.on('tie_break_restart', onTieBreakRestart);
+    s.on('tie_break_resolved', onTieBreakResolved);
+    s.on('game_over', onGameOver);
+    s.on('rematch_update', onRematchUpdate);
 
     setSocket(s);
-    return () => s.disconnect();
+    return () => {
+      if (preBattleTimeoutRef.current) clearTimeout(preBattleTimeoutRef.current);
+      preBattleTimeoutRef.current = null;
+      isAnimatingRef.current = false;
+      s.off('connect', onConnect);
+      s.off('disconnect', onDisconnect);
+      s.off('joined_room', onJoinedRoom);
+      s.off('room_full', onRoomFull);
+      s.off('room_updated', onRoomUpdated);
+      s.off('setup_start', onSetupStart);
+      s.off('setup_update', onSetupUpdate);
+      s.off('setup_timer', onSetupTimer);
+      s.off('game_start', onGameStart);
+      s.off('game_state_update', onGameStateUpdate);
+      s.off('combat_event', onCombatEvent);
+      s.off('tie_break_start', onTieBreakStart);
+      s.off('tie_break_tie', onTieBreakTie);
+      s.off('tie_break_restart', onTieBreakRestart);
+      s.off('tie_break_resolved', onTieBreakResolved);
+      s.off('game_over', onGameOver);
+      s.off('rematch_update', onRematchUpdate);
+      s.disconnect();
+    };
   }, []);
 
   useEffect(() => {
@@ -215,6 +310,9 @@ export function GameProvider({ children }) {
     setGameState(null);
     setGameOver(null);
     setCombatState(null);
+    setCombatPending(null);
+    setTiePending(null);
+    setLastTieCombat(null);
     setPendingGameState(null);
     setTieBreakerState(null);
     setPhase('WAITING');
@@ -259,6 +357,8 @@ export function GameProvider({ children }) {
       setGameState(pendingGameState);
       setPendingGameState(null);
     }
+    // Unlock ONLY when user is ready to select again.
+    isAnimatingRef.current = false;
   };
 
   return (
@@ -272,6 +372,9 @@ export function GameProvider({ children }) {
         gameState,
         gameOver,
         combatState,
+        combatPending,
+        tiePending,
+        lastTieCombat,
         clearCombatAndApplyState,
         tieBreakerState,
         submitTieChoice,

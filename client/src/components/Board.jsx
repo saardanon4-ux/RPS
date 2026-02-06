@@ -37,7 +37,7 @@ function getAdjacentKeys(row, col) {
 }
 
 export default function Board() {
-  const { gameState, playerId, player, gameOver, combatState, clearCombatAndApplyState, tieBreakerState, submitTieChoice, rematchRequested, requestRematch, makeMove } = useGame();
+  const { gameState, playerId, player, players, gameOver, combatState, combatPending, tiePending, clearCombatAndApplyState, tieBreakerState, submitTieChoice, rematchRequested, requestRematch, makeMove, lastTieCombat } = useGame();
   const isPlayer2 = player?.side === 'top';
   const [selected, setSelected] = useState(null); // { row, col }
 
@@ -64,16 +64,8 @@ export default function Board() {
     return valid;
   }, [selected, gameState?.grid, playerId, isMyTurn]);
 
-  const combatCellKeys = useMemo(() => {
-    const src = combatState || tieBreakerState;
-    if (!src || src.fromRow == null) return new Set();
-    const keys = new Set();
-    keys.add(`${src.fromRow},${src.fromCol}`);
-    keys.add(`${src.toRow},${src.toCol}`);
-    return keys;
-  }, [combatState, tieBreakerState]);
-
-  const battleTargetKey = combatState ? `${combatState.toRow},${combatState.toCol}` : null;
+  const activeBattle = combatState || combatPending || tiePending || tieBreakerState;
+  const battleTargetKey = activeBattle?.toRow != null ? `${activeBattle.toRow},${activeBattle.toCol}` : null;
   const isDraw = combatState?.result === 'both_destroyed';
 
   const handleCellClick = (row, col) => {
@@ -114,8 +106,10 @@ export default function Board() {
         className={`relative w-[95vw] max-w-lg aspect-square flex flex-col rounded-lg overflow-hidden shadow-lg border-2 border-stone-300 dark:border-stone-600 ${tieBreakerState ? 'pointer-events-none' : ''}`}
         style={isPlayer2 ? { transform: 'rotate(180deg)' } : undefined}
       >
-        <CombatModal combatState={combatState} playerId={playerId} onComplete={clearCombatAndApplyState} />
-        <TieBreakerModal tieBreakerState={tieBreakerState} onSubmitChoice={submitTieChoice} />
+        <CombatModal key={combatState?.battleId ?? 'combat'} combatState={combatState} playerId={playerId} isPlayer2={isPlayer2} onComplete={clearCombatAndApplyState} />
+        {!(combatState || combatPending) && (
+          <TieBreakerModal key={tieBreakerState?.battleId ?? 'tie'} tieBreakerState={tieBreakerState} isPlayer2={isPlayer2} onSubmitChoice={submitTieChoice} lastTieCombat={lastTieCombat} />
+        )}
         {gameOver && (
           <FlagCaptureCelebration
             won={gameOver.winnerId === playerId}
@@ -123,6 +117,9 @@ export default function Board() {
             rematchRequested={rematchRequested}
             requestRematch={requestRematch}
             playerId={playerId}
+            isPlayer2={isPlayer2}
+            disconnectWin={!!gameOver.disconnectWin}
+            opponentConnected={players.length === 2}
             onComplete={() => {}}
           />
         )}
@@ -136,14 +133,13 @@ export default function Board() {
               const isValidMove = validMoves.has(key);
               const isSelected = selected?.row === row && selected?.col === col;
 
-              const isCombatCell = combatCellKeys.has(key);
               const isBattleTarget = key === battleTargetKey;
               const isDrawSquare = isBattleTarget && isDraw;
               const isCheckeredLight = (row + col) % 2 === 0;
               let bgClass = isCheckeredLight ? 'bg-green-600' : 'bg-green-700';
               if (isValidMove) bgClass = 'bg-yellow-300 dark:bg-yellow-600/80';
               if (isSelected) bgClass += ' ring-2 ring-amber-500 ring-offset-1';
-              if (isCombatCell) bgClass += ' ring-4 ring-red-500 ring-offset-1 animate-pulse';
+              if (isBattleTarget && (combatState || combatPending || tiePending || tieBreakerState)) bgClass += ' ring-4 ring-red-600 ring-offset-1 animate-pulse';
               if (isDrawSquare) bgClass += ' bg-stone-400 dark:bg-stone-500 animate-pulse';
 
               const isMyMobileUnit = isMyUnit && cell && !IMMOBILE_TYPES.includes(cell.type);
@@ -165,21 +161,24 @@ export default function Board() {
               };
 
               return (
-                <motion.div
+                <div
                   key={key}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleCellClick(row, col)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') handleCellClick(row, col);
-                  }}
-                  className={`${TILE_BASE} border border-green-800/50 ${bgClass} relative ${isRevealed ? 'ring-1 ring-sky-400/70 ring-inset' : ''}`}
+                  className="flex-1 min-w-0 aspect-square flex items-center justify-center"
                   style={isPlayer2 ? { transform: 'rotate(180deg)' } : undefined}
                   data-row={row}
                   data-col={col}
-                  whileHover={{ scale: 1.02 }}
-                  transition={{ duration: 0.15 }}
                 >
+                  <motion.div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleCellClick(row, col)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') handleCellClick(row, col);
+                    }}
+                    className={`${TILE_BASE} border border-green-800/50 ${bgClass} relative ${isRevealed ? 'ring-1 ring-sky-400/70 ring-inset' : ''}`}
+                    whileHover={{ scale: 1.02 }}
+                    transition={{ duration: 0.15 }}
+                  >
                   {isRevealed && (
                     <span className="absolute top-0 right-0 text-[8px] sm:text-[10px] leading-none bg-sky-500/80 text-white rounded-bl px-0.5" title="Revealed to enemy">👁</span>
                   )}
@@ -230,7 +229,8 @@ export default function Board() {
                       />
                     )
                   )}
-                </motion.div>
+                  </motion.div>
+                </div>
               );
             })}
           </div>

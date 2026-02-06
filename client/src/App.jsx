@@ -6,18 +6,19 @@ import SetupBoard from './components/SetupBoard';
 import { useGame } from './context/GameContext';
 
 export default function App() {
-  const { setupPhase, setupTimer, roomId, player, players, gameState, gameOver } = useGame();
+  const { setupPhase, setupTimer, roomId, player, players, gameState, gameOver, leaveRoom } = useGame();
 
   const totalSec = 40;
   const progress = setupTimer !== null ? (setupTimer / totalSec) * 100 : 100;
   const inRoom = roomId && player;
   const currentTurn = gameState?.currentTurn;
   const myTurn = currentTurn === player?.id;
+  const opponentLeft = inRoom && (setupPhase || gameState) && players.length === 1;
 
   const [turnRemaining, setTurnRemaining] = useState(30);
   const turnStartTime = gameState?.turnStartTime;
   useEffect(() => {
-    if (!turnStartTime || !myTurn) return;
+    if (!turnStartTime) return;
     const tick = () => {
       const elapsed = (Date.now() - turnStartTime) / 1000;
       setTurnRemaining(Math.max(0, 30 - elapsed));
@@ -25,7 +26,7 @@ export default function App() {
     tick();
     const id = setInterval(tick, 500);
     return () => clearInterval(id);
-  }, [turnStartTime, myTurn, gameState]);
+  }, [turnStartTime, gameState]);
 
   if (!inRoom) {
     return <WelcomeScreen />;
@@ -33,6 +34,18 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-indigo-950/50 to-slate-900 text-white flex flex-col">
+      {opponentLeft && (
+        <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center gap-4 px-4 py-3 bg-amber-900/90 border-b border-amber-600/50 backdrop-blur-sm">
+          <span className="text-amber-200 font-medium">The other player left the room.</span>
+          <button
+            type="button"
+            onClick={leaveRoom}
+            className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-medium transition-colors"
+          >
+            Leave room
+          </button>
+        </div>
+      )}
       {setupPhase && (
         <div className="fixed top-0 left-0 right-0 z-30">
           <div className="h-2 bg-stone-800/80 shadow-inner">

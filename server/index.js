@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync } from 'fs';
+import crypto from 'crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -32,6 +33,10 @@ const IMMOBILE_TYPES = ['flag', 'trap'];
 const SETUP_DURATION_SEC = 40;
 const TIE_BREAKER_DURATION_MS = 7000;
 const TURN_TIMEOUT_SEC = 30;
+
+function makeBattleId(prefix = 'battle') {
+  return `${prefix}-${Date.now()}-${crypto.randomUUID()}`;
+}
 
 function shuffle(arr) {
   const a = [...arr];
@@ -108,7 +113,13 @@ function emitGameState(room) {
 function resolveTieBreaker(room) {
   const tb = room.tieBreaker;
   if (!tb || room.phase !== 'TIE_BREAKER') return;
+  if (tb.isResolving) return;
+  tb.isResolving = true;
   if (tb.timeoutId) clearTimeout(tb.timeoutId);
+  if (tb.restartTimeoutId) {
+    clearTimeout(tb.restartTimeoutId);
+    tb.restartTimeoutId = null;
+  }
 
   const attackerId = tb.attackerId;
   const defenderOwnerId = tb.defenderOwnerId;
@@ -126,11 +137,18 @@ function resolveTieBreaker(room) {
 
   if (choice1 === choice2) {
     // Same choice - show combat (tie) then restart
+    const battleId = `${tb.encounterId}:draw:${tb.round ?? 0}`;
+    if (tb.lastEmittedBattleId === battleId) {
+      tb.isResolving = false;
+      return;
+    }
+    tb.lastEmittedBattleId = battleId;
     const tieCombatResult = { attackerType: choice1, defenderType: choice2, result: 'both_destroyed' };
     room.players.forEach((p) => {
       if (!p.socketId) return;
       const entry = sanitizeGameStateForPlayer(room.gameState, p.id);
       io.to(p.socketId).emit('tie_break_tie', {
+        battleId,
         combatResult: tieCombatResult,
         attackerId,
         fromRow: tb.fromRow, fromCol: tb.fromCol, toRow: tb.toRow, toCol: tb.toCol,
@@ -138,18 +156,26 @@ function resolveTieBreaker(room) {
       });
     });
     tb.choices = {};
-    tb.deadline = Date.now() + TIE_BREAKER_DURATION_MS;
-    tb.timeoutId = setTimeout(() => resolveTieBreaker(room), TIE_BREAKER_DURATION_MS + 3200);
-    setTimeout(() => {
+    // Give players a full choice window AFTER the reveal animation.
+    tb.restartTimeoutId = setTimeout(() => {
       if (!room.tieBreaker) return;
+      tb.round = (tb.round ?? 0) + 1;
+      const restartBattleId = `${tb.encounterId}:restart:${tb.round}`;
+      tb.deadline = Date.now() + TIE_BREAKER_DURATION_MS;
+      if (tb.timeoutId) clearTimeout(tb.timeoutId);
+      tb.timeoutId = setTimeout(() => resolveTieBreaker(room), TIE_BREAKER_DURATION_MS);
       room.players.forEach((p) => {
         if (!p.socketId) return;
         io.to(p.socketId).emit('tie_break_restart', {
+          battleId: restartBattleId,
           deadline: tb.deadline,
           fromRow: tb.fromRow, fromCol: tb.fromCol, toRow: tb.toRow, toCol: tb.toCol,
         });
       });
+      tb.isResolving = false;
     }, 2800);
+    // Allow future resolves after we schedule restart.
+    tb.isResolving = false;
     return;
   }
 
@@ -181,6 +207,7 @@ function resolveTieBreaker(room) {
     if (!p.socketId) return;
     const entry = sanitizeGameStateForPlayer(room.gameState, p.id);
     io.to(p.socketId).emit('tie_break_resolved', {
+      battleId: `${tb.encounterId}:resolve:${tb.round ?? 0}`,
       combatResult, attackerId,
       fromRow: tb.fromRow, fromCol: tb.fromCol, toRow: tb.toRow, toCol: tb.toCol,
       newGameState: entry,
@@ -195,6 +222,8 @@ function resolveTieBreaker(room) {
       io.to(p.socketId).emit('game_over', { winnerId: gameOver, flagCapture: false });
     });
   }
+  // Done resolving this encounter.
+  tb.isResolving = false;
 }
 
 function countPlacedForPlayer(grid, playerId, side) {
@@ -229,10 +258,12 @@ function smartFillEmptySlots(room, playerId) {
   for (let i = 0; i < rockCount; i++) toPlace.push('rock');
   for (let i = 0; i < paperCount; i++) toPlace.push('paper');
   for (let i = 0; i < scissorsCount; i++) toPlace.push('scissors');
-  shuffle(toPlace);
-  for (let i = 0; i < totalEmpty && i < toPlace.length; i++) {
-    const [r, c] = emptySlots[i];
-    const type = toPlace[i];
+  const shuffled = shuffle(toPlace);
+  // Shuffle BOTH the pieces and the coordinates to avoid perceived clustering.
+  const shuffledSlots = shuffle(emptySlots);
+  for (let i = 0; i < totalEmpty && i < shuffled.length; i++) {
+    const [r, c] = shuffledSlots[i];
+    const type = shuffled[i];
     room.setupGrid[r][c] = {
       type,
       id: `${player.side}-${type}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -341,9 +372,15 @@ function executeMove(room, fromRow, fromCol, toRow, toCol, movingPlayerId) {
     } else if (fromCell.type === defender.type) {
       room.phase = 'TIE_BREAKER';
       const deadline = Date.now() + TIE_BREAKER_DURATION_MS;
+      const encounterId = makeBattleId('tie');
       room.tieBreaker = {
         fromRow, fromCol, toRow, toCol,
         attackerId: movingPlayerId, defenderOwnerId: defender.owner, unitType: fromCell.type,
+        encounterId,
+        round: 0,
+        lastEmittedBattleId: null,
+        isResolving: false,
+        restartTimeoutId: null,
         deadline, choices: {},
         timeoutId: setTimeout(() => resolveTieBreaker(room), TIE_BREAKER_DURATION_MS),
       };
@@ -353,7 +390,7 @@ function executeMove(room, fromRow, fromCol, toRow, toCol, movingPlayerId) {
       }
       room.players.forEach((p) => {
         if (!p.socketId) return;
-        io.to(p.socketId).emit('tie_break_start', { deadline, unitType: fromCell.type, fromRow, fromCol, toRow, toCol });
+        io.to(p.socketId).emit('tie_break_start', { battleId: `${encounterId}:start:0`, deadline, unitType: fromCell.type, fromRow, fromCol, toRow, toCol });
       });
       return 'tie_breaker';
     } else {
@@ -374,10 +411,12 @@ function executeMove(room, fromRow, fromCol, toRow, toCol, movingPlayerId) {
   }
 
   if (combatResult) {
+    const battleId = makeBattleId('combat');
     room.players.forEach((p) => {
       if (!p.socketId) return;
       const entry = sanitizeGameStateForPlayer(room.gameState, p.id);
       io.to(p.socketId).emit('combat_event', {
+        battleId,
         ...combatResult,
         attackerId: movingPlayerId,
         fromRow, fromCol, toRow, toCol,
@@ -751,9 +790,23 @@ io.on('connection', (socket) => {
       if (room) {
         if (room.setupInterval) clearInterval(room.setupInterval);
         if (room.tieBreaker?.timeoutId) clearTimeout(room.tieBreaker.timeoutId);
-        room.players = room.players.filter((p) => p.id !== socket.playerId);
-        if (room.players.length === 0) rooms.delete(socket.roomId);
-        else io.to(socket.roomId).emit('room_updated', { roomId: socket.roomId, players: room.players.map((x) => ({ id: x.id, name: x.name, side: x.side })) });
+        const leaverId = socket.playerId;
+        room.players = room.players.filter((p) => p.id !== leaverId);
+        const remaining = room.players[0];
+        if (!remaining) {
+          rooms.delete(socket.roomId);
+        } else {
+          // Treat as win for remaining player if a game was in progress or setup was ready.
+          room.phase = 'GAME_OVER';
+          room.rematchRequested = {};
+          room.lastWinnerId = remaining.id;
+          room.lastFlagCapture = false;
+          if (room.turnTimerInterval) {
+            clearInterval(room.turnTimerInterval);
+            room.turnTimerInterval = null;
+          }
+          io.to(remaining.socketId).emit('game_over', { winnerId: remaining.id, flagCapture: false, disconnectWin: true });
+        }
       }
       socket.leave(socket.roomId);
       socket.roomId = null;
@@ -764,11 +817,27 @@ io.on('connection', (socket) => {
     if (socket.roomId && socket.playerId) {
       const room = rooms.get(socket.roomId);
       if (room) {
-        const p = room.players.find((x) => x.id === socket.playerId);
-        if (p) {
-          p.socketId = null;
+        const leftId = socket.playerId;
+        room.players = room.players.filter((p) => p.id !== leftId);
+        if (room.players.length === 0) {
+          if (room.setupInterval) clearInterval(room.setupInterval);
+          if (room.turnTimerInterval) clearInterval(room.turnTimerInterval);
+          if (room.tieBreaker?.timeoutId) clearTimeout(room.tieBreaker.timeoutId);
+          rooms.delete(socket.roomId);
+        } else {
+          const remaining = room.players[0];
+          room.phase = 'GAME_OVER';
+          room.rematchRequested = {};
+          room.lastWinnerId = remaining.id;
+          room.lastFlagCapture = false;
+          if (room.turnTimerInterval) {
+            clearInterval(room.turnTimerInterval);
+            room.turnTimerInterval = null;
+          }
           room.players.forEach((q) => {
-            if (q.socketId) io.to(q.socketId).emit('room_updated', { roomId: socket.roomId, players: room.players.map((x) => ({ id: x.id, name: x.name, side: x.side })) });
+            if (!q.socketId) return;
+            io.to(q.socketId).emit('room_updated', { roomId: socket.roomId, players: room.players.map((x) => ({ id: x.id, name: x.name, side: x.side })) });
+            io.to(q.socketId).emit('game_over', { winnerId: remaining.id, flagCapture: false, disconnectWin: true });
           });
         }
       }
