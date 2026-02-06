@@ -55,7 +55,11 @@ export function GameProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    // Do not open a game socket before we have an auth token
+    if (!authToken) return;
+
     const s = io(SOCKET_URL, {
+      auth: { token: authToken },
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 10,
@@ -306,7 +310,7 @@ export function GameProvider({ children }) {
       s.off('emoji_reaction', onEmojiReaction);
       s.disconnect();
     };
-  }, []);
+  }, [authToken]);
 
   useEffect(() => {
     if (!socket || players.length !== 2) return;
@@ -328,20 +332,12 @@ export function GameProvider({ children }) {
     return () => clearInterval(interval);
   }, [socket, gameOver, rematchRequested, playerId]);
 
-  const joinRoom = (rid, playerName) => {
+  const joinRoom = (rid) => {
     const roomIdToUse = (rid || '').trim() || crypto.randomUUID().slice(0, 8);
     if (!socket) return;
     setError(null);
-    const persistentId =
-      (typeof localStorage !== 'undefined' && localStorage.getItem('rps_player_id')) ||
-      crypto.randomUUID();
-    if (typeof localStorage !== 'undefined') localStorage.setItem('rps_player_id', persistentId);
     socket.emit('join_room', {
       roomId: roomIdToUse,
-      playerName: playerName || undefined,
-      persistentPlayerId: persistentId,
-      teamName: authUser?.group?.name,
-      teamColor: authUser?.group?.color,
     });
   };
 

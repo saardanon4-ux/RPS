@@ -7,34 +7,33 @@ import { existsSync } from 'fs';
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import cors from 'cors';
+import jwt from 'jsonwebtoken';
+import { register as registerUser, login as loginUser } from './controllers/authController.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const prisma = new PrismaClient();
 const app = express();
 app.use(express.json());
+
+const allowedOrigin = process.env.CLIENT_URL || 'http://localhost:5173';
+const JWT_SECRET = process.env.JWT_SECRET || 'development-secret-change-me';
+
 app.use(
   cors({
-    origin: '*',
+    origin: allowedOrigin,
     credentials: true,
   }),
 );
 const httpServer = createServer(app);
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
-const corsOrigins = CLIENT_URL.split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
-if (corsOrigins.length === 0) corsOrigins.push('http://localhost:5173');
-// In dev, also allow common local variants
-const devOrigins = ['http://localhost:5174', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174'];
-const allowedOrigins = [...new Set([...corsOrigins, ...devOrigins])];
 
 const io = new Server(httpServer, {
   // Relaxed heartbeat settings to be friendlier to slow / mobile networks
   pingTimeout: 60000,
   pingInterval: 25000,
   cors: {
-    origin: allowedOrigins,
+    origin: allowedOrigin,
     methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 
@@ -506,10 +505,46 @@ function transitionToPlaying(room) {
 
 const rooms = new Map();
 
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth && socket.handshake.auth.token;
+    if (!token) {
+      const err = new Error('Unauthorized');
+      err.data = { code: 'NO_TOKEN' };
+      return next(err);
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.sub },
+      include: { group: true },
+    });
+    if (!user) {
+      const err = new Error('Unauthorized');
+      err.data = { code: 'USER_NOT_FOUND' };
+      return next(err);
+    }
+
+    socket.user = {
+      id: user.id,
+      username: user.username,
+      groupId: user.groupId,
+      teamName: user.group?.name || null,
+      teamColor: user.group?.color || null,
+    };
+    next();
+  } catch (err) {
+    console.error('Socket auth error:', err);
+    const error = new Error('Unauthorized');
+    error.data = { code: 'INVALID_TOKEN' };
+    next(error);
+  }
+});
+
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
-  socket.on('join_room', ({ roomId, playerName, persistentPlayerId, teamName, teamColor }) => {
+  socket.on('join_room', ({ roomId }) => {
     const rid = roomId || `room-${Date.now()}`;
     let room = rooms.get(rid);
     if (!room) {
@@ -517,7 +552,7 @@ io.on('connection', (socket) => {
       rooms.set(rid, room);
     }
 
-    const pid = persistentPlayerId || socket.id;
+    const pid = socket.user?.id || socket.id;
     const existingPlayer = room.players.find((p) => p.id === pid);
 
     if (existingPlayer) {
@@ -590,13 +625,17 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const playerName = socket.user?.username || `Player ${room.players.length + 1}`;
+    const teamName = socket.user?.teamName || null;
+    const teamColor = socket.user?.teamColor || null;
+
     const player = {
       id: pid,
       socketId: socket.id,
-      name: playerName || `Player ${room.players.length + 1}`,
+      name: playerName,
       side: room.players.length === 0 ? 'bottom' : 'top',
-      teamName: teamName || null,
-      teamColor: teamColor || null,
+      teamName,
+      teamColor,
     };
     room.players.push(player);
 
@@ -939,6 +978,41 @@ io.on('connection', (socket) => {
 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok', rooms: rooms.size }));
+
+app.post('/auth/register', async (req, res) => {
+  try {
+    const { username, password, groupId, groupName } = req.body || {};
+    let finalGroupName = groupName || null;
+
+    if (!finalGroupName && groupId != null) {
+      const group = await prisma.group.findUnique({
+        where: { id: Number(groupId) },
+        select: { name: true },
+      });
+      if (!group) {
+        return res.status(400).json({ error: 'Invalid groupId' });
+      }
+      finalGroupName = group.name;
+    }
+
+    const result = await registerUser(username, password, finalGroupName);
+    res.json(result);
+  } catch (err) {
+    console.error('Error in /auth/register', err);
+    res.status(400).json({ error: err.message || 'Registration failed' });
+  }
+});
+
+app.post('/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body || {};
+    const result = await loginUser(username, password);
+    res.json(result);
+  } catch (err) {
+    console.error('Error in /auth/login', err);
+    res.status(400).json({ error: err.message || 'Login failed' });
+  }
+});
 
 app.get('/auth/groups', async (req, res) => {
   try {
