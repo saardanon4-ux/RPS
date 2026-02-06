@@ -1,30 +1,33 @@
-# Build stage - React client
-FROM node:20-alpine AS client-builder
-RUN echo 'http://dl-cdn.alpinelinux.org/alpine/v3.15/main' >> /etc/apk/repositories && \
-    apk add --no-cache openssl compat-openssl1.1
+# --- Stage 1: Base (Shared setup) ---
+FROM node:20-slim AS base
+# Install OpenSSL (Required for Prisma)
+RUN apt-get update -y && apt-get install -y openssl ca-certificates
+
+# --- Stage 2: Client Builder ---
+FROM base AS client-builder
 WORKDIR /app/client
 COPY client/package*.json ./
 RUN npm ci
 COPY client/ ./
 RUN npm run build
 
-# Production stage - Node server + static client
-FROM node:20-alpine
-RUN echo 'http://dl-cdn.alpinelinux.org/alpine/v3.15/main' >> /etc/apk/repositories && \
-    apk add --no-cache openssl compat-openssl1.1
+# --- Stage 3: Production Server ---
+FROM base
 WORKDIR /app
 
-# Install server dependencies
+# Copy server dependencies
 COPY server/package*.json ./
 RUN npm ci --omit=dev
 
-# Copy server source and built client
+# Copy server code
 COPY server/ ./
+
+# Copy built client from previous stage
 COPY --from=client-builder /app/client/dist ./client/dist
 
-EXPOSE 3000
+# Expose port and set environment
 ENV NODE_ENV=production
-ENV PORT=3000
+EXPOSE 3000
 
-# Ensure Prisma Client is generated in the runtime image before starting
+# STARTUP COMMAND (Fixes the crash loop)
 CMD ["sh", "-c", "npx prisma generate && node index.js"]
