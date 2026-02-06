@@ -33,6 +33,7 @@ const IMMOBILE_TYPES = ['flag', 'trap'];
 const SETUP_DURATION_SEC = 40;
 const TIE_BREAKER_DURATION_MS = 7000;
 const TURN_TIMEOUT_SEC = 30;
+const DISCONNECT_GRACE_MS = 8000;
 
 function makeBattleId(prefix = 'battle') {
   return `${prefix}-${Date.now()}-${crypto.randomUUID()}`;
@@ -817,28 +818,46 @@ io.on('connection', (socket) => {
     if (socket.roomId && socket.playerId) {
       const room = rooms.get(socket.roomId);
       if (room) {
-        const leftId = socket.playerId;
-        room.players = room.players.filter((p) => p.id !== leftId);
-        if (room.players.length === 0) {
-          if (room.setupInterval) clearInterval(room.setupInterval);
-          if (room.turnTimerInterval) clearInterval(room.turnTimerInterval);
-          if (room.tieBreaker?.timeoutId) clearTimeout(room.tieBreaker.timeoutId);
-          rooms.delete(socket.roomId);
-        } else {
-          const remaining = room.players[0];
-          room.phase = 'GAME_OVER';
-          room.rematchRequested = {};
-          room.lastWinnerId = remaining.id;
-          room.lastFlagCapture = false;
-          if (room.turnTimerInterval) {
-            clearInterval(room.turnTimerInterval);
-            room.turnTimerInterval = null;
+        const player = room.players.find((p) => p.id === socket.playerId);
+        if (player) {
+          // Mark player as temporarily disconnected and start grace timer.
+          player.socketId = null;
+          if (!room.disconnectTimers) room.disconnectTimers = {};
+          if (room.disconnectTimers[player.id]) {
+            clearTimeout(room.disconnectTimers[player.id]);
           }
-          room.players.forEach((q) => {
-            if (!q.socketId) return;
-            io.to(q.socketId).emit('room_updated', { roomId: socket.roomId, players: room.players.map((x) => ({ id: x.id, name: x.name, side: x.side })) });
-            io.to(q.socketId).emit('game_over', { winnerId: remaining.id, flagCapture: false, disconnectWin: true });
-          });
+          room.disconnectTimers[player.id] = setTimeout(() => {
+            const r = rooms.get(socket.roomId);
+            if (!r) return;
+            const still = r.players.find((p) => p.id === player.id);
+            // If player reconnected (socketId restored) – do nothing.
+            if (!still || still.socketId) return;
+
+            // Treat as permanent leave after grace period.
+            r.players = r.players.filter((p) => p.id !== player.id);
+            if (r.players.length === 0) {
+              if (r.setupInterval) clearInterval(r.setupInterval);
+              if (r.turnTimerInterval) clearInterval(r.turnTimerInterval);
+              if (r.tieBreaker?.timeoutId) clearTimeout(r.tieBreaker.timeoutId);
+              rooms.delete(r.roomId);
+              return;
+            }
+
+            const remaining = r.players[0];
+            r.phase = 'GAME_OVER';
+            r.rematchRequested = {};
+            r.lastWinnerId = remaining.id;
+            r.lastFlagCapture = false;
+            if (r.turnTimerInterval) {
+              clearInterval(r.turnTimerInterval);
+              r.turnTimerInterval = null;
+            }
+            r.players.forEach((q) => {
+              if (!q.socketId) return;
+              io.to(q.socketId).emit('room_updated', { roomId: r.roomId, players: r.players.map((x) => ({ id: x.id, name: x.name, side: x.side })) });
+              io.to(q.socketId).emit('game_over', { winnerId: remaining.id, flagCapture: false, disconnectWin: true });
+            });
+          }, DISCONNECT_GRACE_MS);
         }
       }
     }
