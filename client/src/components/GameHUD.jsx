@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 
-function PlayerSlot({ player, isCurrentTurn, isLocal }) {
+function PlayerSlot({ player, isCurrentTurn, isLocal, emoji }) {
   const name = player?.name || (isLocal ? 'You' : 'Opponent');
   const initial = name ? name.charAt(0).toUpperCase() : '?';
   return (
@@ -20,21 +20,31 @@ function PlayerSlot({ player, isCurrentTurn, isLocal }) {
       >
         {initial}
       </div>
-      <span
-        className={`font-semibold text-sm truncate max-w-[80px] ${
-          isCurrentTurn ? 'text-emerald-300' : 'text-white/80'
-        }`}
-        style={isCurrentTurn ? { textShadow: '0 0 12px rgba(52,211,153,0.6)' } : undefined}
-      >
-        {name}
-      </span>
+      <div className="flex items-center gap-1">
+        <span
+          className={`font-semibold text-sm truncate max-w-[80px] ${
+            isCurrentTurn ? 'text-emerald-300' : 'text-white/80'
+          }`}
+          style={isCurrentTurn ? { textShadow: '0 0 12px rgba(52,211,153,0.6)' } : undefined}
+        >
+          {name}
+        </span>
+        {emoji && (
+          <span className="text-lg leading-none drop-shadow-[0_0_8px_rgba(0,0,0,0.6)] animate-bounce">
+            {emoji}
+          </span>
+        )}
+      </div>
     </motion.div>
   );
 }
 
-export default function GameHUD({ players, currentTurn, turnRemaining, gameOver, localPlayerId }) {
+export default function GameHUD({ players, currentTurn, turnRemaining, gameOver, localPlayerId, emojiReactions }) {
   const player1 = players.find((p) => p.side === 'bottom');
   const player2 = players.find((p) => p.side === 'top');
+
+  const p1Emoji = player1 ? emojiReactions?.[player1.id]?.emoji : null;
+  const p2Emoji = player2 ? emojiReactions?.[player2.id]?.emoji : null;
 
   return (
     <div className="flex items-center justify-between gap-2 px-4 py-2 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 w-full max-w-2xl">
@@ -42,6 +52,7 @@ export default function GameHUD({ players, currentTurn, turnRemaining, gameOver,
         player={player1}
         isCurrentTurn={!gameOver && currentTurn === player1?.id}
         isLocal={localPlayerId === player1?.id}
+        emoji={p1Emoji}
       />
       <div className="flex flex-col items-center gap-0.5 min-w-[100px]">
         {gameOver ? (
@@ -68,6 +79,7 @@ export default function GameHUD({ players, currentTurn, turnRemaining, gameOver,
         player={player2}
         isCurrentTurn={!gameOver && currentTurn === player2?.id}
         isLocal={localPlayerId === player2?.id}
+        emoji={p2Emoji}
       />
     </div>
   );

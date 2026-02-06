@@ -42,14 +42,14 @@ export default function TieBreakerModal({ tieBreakerState, isPlayer2, onSubmitCh
 
   const modalContent = (
     <motion.div
-      className="absolute inset-0 z-20 flex items-center justify-center rounded-lg overflow-hidden pointer-events-auto"
+      className="absolute inset-0 z-20 flex items-center justify-center px-3 pointer-events-auto"
       style={{ backdropFilter: 'blur(10px)', backgroundColor: 'rgba(0,0,0,0.7)' }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
       <motion.div
-        className="flex flex-col items-center gap-6 px-8 py-10 bg-stone-900/95 rounded-2xl border-2 border-amber-500/50 shadow-2xl max-w-sm w-full mx-4"
+        className="flex flex-col items-center gap-5 px-5 py-6 sm:px-8 sm:py-8 bg-stone-900/95 rounded-2xl border-2 border-amber-500/50 shadow-2xl max-w-sm w-full mx-4 max-h-[90vh] overflow-y-auto"
         initial={{ scale: 0.9 }}
         animate={{ scale: 1 }}
         transition={{ type: 'spring', stiffness: 200 }}

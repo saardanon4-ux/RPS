@@ -28,6 +28,7 @@ export function GameProvider({ children }) {
   const [rematchRequested, setRematchRequested] = useState({});
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState(null);
+  const [emojiReactions, setEmojiReactions] = useState({});
   const stateRef = useRef({ roomId: '', player: null });
   stateRef.current = { roomId, player };
   // CRITICAL UI lock: prevents re-triggering animations due to duplicate/overlapping events.
@@ -222,6 +223,23 @@ export function GameProvider({ children }) {
       setRematchRequested(rr ?? {});
     };
 
+    const onEmojiReaction = ({ fromPlayerId, emoji }) => {
+      if (!fromPlayerId || !emoji) return;
+      const ts = Date.now();
+      setEmojiReactions((prev) => ({
+        ...prev,
+        [fromPlayerId]: { emoji, at: ts },
+      }));
+      setTimeout(() => {
+        setEmojiReactions((prev) => {
+          const entry = prev[fromPlayerId];
+          if (!entry || entry.at !== ts) return prev;
+          const { [fromPlayerId]: _removed, ...rest } = prev;
+          return rest;
+        });
+      }, 3000);
+    };
+
     s.on('connect', onConnect);
     s.on('disconnect', onDisconnect);
     s.on('joined_room', onJoinedRoom);
@@ -239,6 +257,7 @@ export function GameProvider({ children }) {
     s.on('tie_break_resolved', onTieBreakResolved);
     s.on('game_over', onGameOver);
     s.on('rematch_update', onRematchUpdate);
+    s.on('emoji_reaction', onEmojiReaction);
 
     setSocket(s);
     return () => {
@@ -262,6 +281,7 @@ export function GameProvider({ children }) {
       s.off('tie_break_resolved', onTieBreakResolved);
       s.off('game_over', onGameOver);
       s.off('rematch_update', onRematchUpdate);
+      s.off('emoji_reaction', onEmojiReaction);
       s.disconnect();
     };
   }, []);
@@ -351,6 +371,11 @@ export function GameProvider({ children }) {
     if (socket) socket.emit('request_rematch');
   };
 
+  const sendEmoji = (emoji) => {
+    if (!socket || !roomId || !playerId || !emoji) return;
+    socket.emit('send_emoji', { emoji });
+  };
+
   const clearCombatAndApplyState = () => {
     setCombatState(null);
     if (pendingGameState) {
@@ -380,6 +405,8 @@ export function GameProvider({ children }) {
         submitTieChoice,
         rematchRequested,
         requestRematch,
+        emojiReactions,
+        sendEmoji,
         makeMove,
         phase,
         setupPhase,

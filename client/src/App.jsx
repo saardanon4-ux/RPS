@@ -5,8 +5,39 @@ import GameHUD from './components/GameHUD';
 import SetupBoard from './components/SetupBoard';
 import { useGame } from './context/GameContext';
 
+const EMOJI_OPTIONS = ['🤫', '✂️', '🧠', '💣', '😂', '😈'];
+
+function EmojiBar({ onSend, disabled }) {
+  if (disabled) return null;
+  return (
+    <div className="flex items-center justify-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 w-full max-w-xs">
+      {EMOJI_OPTIONS.map((emoji) => (
+        <button
+          key={emoji}
+          type="button"
+          onClick={() => onSend(emoji)}
+          className="text-xl hover:scale-110 active:scale-95 transition-transform"
+        >
+          {emoji}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function App() {
-  const { setupPhase, setupTimer, roomId, player, players, gameState, gameOver, leaveRoom } = useGame();
+  const {
+    setupPhase,
+    setupTimer,
+    roomId,
+    player,
+    players,
+    gameState,
+    gameOver,
+    leaveRoom,
+    emojiReactions,
+    sendEmoji,
+  } = useGame();
 
   const totalSec = 40;
   const progress = setupTimer !== null ? (setupTimer / totalSec) * 100 : 100;
@@ -88,7 +119,11 @@ export default function App() {
             turnRemaining={gameOver ? null : turnRemaining}
             gameOver={!!gameOver}
             localPlayerId={player?.id}
+            emojiReactions={emojiReactions}
           />
+        )}
+        {players.length === 2 && !setupPhase && gameState && (
+          <EmojiBar onSend={sendEmoji} disabled={!player} />
         )}
       </header>
 

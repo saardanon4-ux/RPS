@@ -785,6 +785,21 @@ io.on('connection', (socket) => {
     if (bothSubmitted) resolveTieBreaker(room);
   });
 
+  socket.on('send_emoji', ({ emoji }) => {
+    if (!socket.roomId || !emoji) return;
+    const room = rooms.get(socket.roomId);
+    if (!room) return;
+    const fromPlayerId = socket.playerId;
+    if (!fromPlayerId) return;
+    room.players.forEach((p) => {
+      if (!p.socketId) return;
+      io.to(p.socketId).emit('emoji_reaction', {
+        fromPlayerId,
+        emoji: String(emoji).slice(0, 8), // tiny safety guard
+      });
+    });
+  });
+
   socket.on('leave_room', () => {
     if (socket.roomId) {
       const room = rooms.get(socket.roomId);
