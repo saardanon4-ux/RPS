@@ -64,11 +64,17 @@ export default function App() {
   }, [turnStartTime, gameState]);
 
   useEffect(() => {
-    if (!setupPhase || players.length !== 2) return;
+    if (!setupPhase || players.length !== 2) {
+      setShowMatchup(false);
+      return;
+    }
+    // Show matchup screen briefly at the beginning of setup
     setShowMatchup(true);
+    const id = setTimeout(() => {
+      setShowMatchup(false);
+    }, 3000);
+    return () => clearTimeout(id);
   }, [setupPhase, players.length]);
-
-  const closeMatchup = () => setShowMatchup(false);
 
   if (!inRoom) {
     return <WelcomeScreen />;
@@ -161,7 +167,6 @@ export default function App() {
       {players.length === 2 && (
         <MatchupScreen
           visible={showMatchup}
-          onComplete={closeMatchup}
           player1={players.find((p) => p.side === 'bottom') || players[0]}
           player2={players.find((p) => p.side === 'top') || players[1]}
         />

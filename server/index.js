@@ -325,7 +325,16 @@ function startSetupPhase(room) {
     }
   }, 1000);
 
-  const playersPayload = room.players.map((p) => ({ id: p.id, name: p.name, side: p.side }));
+  const playersPayload = room.players.map((p) => ({
+    id: p.id,
+    name: p.name,
+    side: p.side,
+    teamName: p.teamName,
+    teamColor: p.teamColor,
+    wins: p.wins,
+    losses: p.losses,
+    draws: p.draws,
+  }));
   room.players.forEach((p) => {
     if (!p.socketId) return;
     const gridForPlayer = room.setupGrid.map((row) =>

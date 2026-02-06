@@ -428,119 +428,123 @@ export default function WelcomeScreen() {
             </form>
           )}
 
-          {/* Room / Lobby section */}
-          <form onSubmit={handleJoin} className="space-y-5">
-            <motion.div
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.25 }}
-            >
-              <label htmlFor="room" className="block text-sm font-semibold text-white/80 mb-2">
-                מזהה חדר
-              </label>
-              <input
-                id="room"
-                type="text"
-                inputMode="text"
-                autoComplete="off"
-                value={inputRoomId}
-                onChange={(e) => setInputRoomId(e.target.value)}
-                onFocus={() => setFocusedField('room')}
-                onBlur={() => setFocusedField(null)}
-                placeholder="abc123 או השאר ריק ליצירת חדר חדש"
-                className={`w-full px-4 py-3.5 rounded-xl bg-white/5 border-2 text-white placeholder-white/40 outline-none transition-all duration-300 ${
-                  focusedField === 'room'
-                    ? 'border-amber-400/80 shadow-[0_0_20px_rgba(251,191,36,0.3)]'
-                    : 'border-white/20 hover:border-white/30'
-                }`}
-              />
-            </motion.div>
+          {authUser ? (
+            <>
+              {/* Room / Lobby section (only for authenticated users) */}
+              <form onSubmit={handleJoin} className="space-y-5">
+                <motion.div
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.25 }}
+                >
+                  <label htmlFor="room" className="block text-sm font-semibold text-white/80 mb-2">
+                    מזהה חדר
+                  </label>
+                  <input
+                    id="room"
+                    type="text"
+                    inputMode="text"
+                    autoComplete="off"
+                    value={inputRoomId}
+                    onChange={(e) => setInputRoomId(e.target.value)}
+                    onFocus={() => setFocusedField('room')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="abc123 או השאר ריק ליצירת חדר חדש"
+                    className={`w-full px-4 py-3.5 rounded-xl bg-white/5 border-2 text-white placeholder-white/40 outline-none transition-all duration-300 ${
+                      focusedField === 'room'
+                        ? 'border-amber-400/80 shadow-[0_0_20px_rgba(251,191,36,0.3)]'
+                        : 'border-white/20 hover:border-white/30'
+                    }`}
+                  />
+                </motion.div>
 
-            {error && (
-              <motion.p
-                className="text-red-400 text-sm font-medium"
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                {error}
-              </motion.p>
-            )}
-
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              <motion.button
-                type="submit"
-                disabled={!connected || !authUser}
-                className="w-full py-4 rounded-xl font-bold text-lg text-stone-900 bg-gradient-to-r from-amber-400 to-orange-500 disabled:from-stone-500 disabled:to-stone-600 disabled:cursor-not-allowed relative overflow-hidden"
-                style={{
-                  boxShadow: connected
-                    ? '0 0 30px rgba(251,191,36,0.4), 0 4px 20px rgba(0,0,0,0.3)'
-                    : 'none',
-                }}
-                whileHover={connected ? { scale: 1.02 } : {}}
-                whileTap={connected ? { scale: 0.98 } : {}}
-              >
-                {!connected
-                  ? 'מתחבר לשרת...'
-                  : !authUser
-                    ? 'התחבר כדי להיכנס לחדר'
-                    : 'הצטרף למשחק'}
-              </motion.button>
-            </motion.div>
-          </form>
-
-          {/* Live lobby: active games */}
-          <div className="mt-6">
-            <h2 className="text-sm font-semibold text-white/90 mb-2">משחקים פעילים</h2>
-            {activeRoomsLoading && (
-              <p className="text-xs text-white/70">טוען חדרים...</p>
-            )}
-            {activeRoomsError && !activeRoomsLoading && (
-              <p className="text-xs text-red-400">{activeRoomsError}</p>
-            )}
-            {!activeRoomsLoading && !activeRoomsError && activeRooms.length === 0 && (
-              <p className="text-xs text-white/60">אין כרגע חדרים פתוחים. פתח חדר חדש!</p>
-            )}
-            {!activeRoomsLoading && !activeRoomsError && activeRooms.length > 0 && (
-              <div className="space-y-2">
-                {activeRooms.map((room) => (
-                  <button
-                    key={room.roomId}
-                    type="button"
-                    onClick={() => {
-                      setInputRoomId(room.roomId);
-                      if (authUser && connected) {
-                        joinRoom(room.roomId);
-                      }
-                    }}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white/90 hover:bg-white/10 transition-colors"
+                {error && (
+                  <motion.p
+                    className="text-red-400 text-sm font-medium"
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
                   >
-                    <div className="flex flex-col items-start gap-0.5">
-                      <span className="font-semibold">
-                        חדר {room.roomId}
-                      </span>
-                      <span className="text-[11px] text-white/70">
-                        יוצר: {room.playerName} {room.teamName ? `(${room.teamName})` : ''}
-                      </span>
-                    </div>
-                    <div className="flex flex-col items-end gap-0.5">
-                      <span className="text-[11px] text-white/70">
-                        מצב: {room.phase === 'WAITING' ? 'ממתין לשחקן' : 'שלב הכנה'}
-                      </span>
-                      <span className="text-[10px] text-white/60">
-                        שחקנים: {room.playersCount}/2
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+                    {error}
+                  </motion.p>
+                )}
 
-          <Leaderboard />
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                >
+                  <motion.button
+                    type="submit"
+                    disabled={!connected}
+                    className="w-full py-4 rounded-xl font-bold text-lg text-stone-900 bg-gradient-to-r from-amber-400 to-orange-500 disabled:from-stone-500 disabled:to-stone-600 disabled:cursor-not-allowed relative overflow-hidden"
+                    style={{
+                      boxShadow: connected
+                        ? '0 0 30px rgba(251,191,36,0.4), 0 4px 20px rgba(0,0,0,0.3)'
+                        : 'none',
+                    }}
+                    whileHover={connected ? { scale: 1.02 } : {}}
+                    whileTap={connected ? { scale: 0.98 } : {}}
+                  >
+                    {!connected ? 'מתחבר לשרת...' : 'הצטרף למשחק'}
+                  </motion.button>
+                </motion.div>
+              </form>
+
+              {/* Live lobby: active games */}
+              <div className="mt-6">
+                <h2 className="text-sm font-semibold text-white/90 mb-2">משחקים פעילים</h2>
+                {activeRoomsLoading && (
+                  <p className="text-xs text-white/70">טוען חדרים...</p>
+                )}
+                {activeRoomsError && !activeRoomsLoading && (
+                  <p className="text-xs text-red-400">{activeRoomsError}</p>
+                )}
+                {!activeRoomsLoading && !activeRoomsError && activeRooms.length === 0 && (
+                  <p className="text-xs text-white/60">אין כרגע חדרים פתוחים. פתח חדר חדש!</p>
+                )}
+                {!activeRoomsLoading && !activeRoomsError && activeRooms.length > 0 && (
+                  <div className="space-y-2">
+                    {activeRooms.map((room) => (
+                      <button
+                        key={room.roomId}
+                        type="button"
+                        onClick={() => {
+                          setInputRoomId(room.roomId);
+                          if (connected) {
+                            joinRoom(room.roomId);
+                          }
+                        }}
+                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white/90 hover:bg-white/10 transition-colors"
+                      >
+                        <div className="flex flex-col items-start gap-0.5">
+                          <span className="font-semibold">
+                            חדר {room.roomId}
+                          </span>
+                          <span className="text-[11px] text-white/70">
+                            יוצר: {room.playerName} {room.teamName ? `(${room.teamName})` : ''}
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className="text-[11px] text-white/70">
+                            מצב: {room.phase === 'WAITING' ? 'ממתין לשחקן' : 'שלב הכנה'}
+                          </span>
+                          <span className="text-[10px] text-white/60">
+                            שחקנים: {room.playersCount}/2
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <Leaderboard />
+            </>
+          ) : (
+            <p className="mt-4 text-xs text-white/70">
+              התחבר כדי לפתוח חדרים, לראות משחקים פעילים ולהצטרף לקרב.
+            </p>
+          )}
         </div>
       </motion.div>
 

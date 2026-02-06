@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function PlayerCard({ player, align = 'left' }) {
@@ -45,15 +44,7 @@ function PlayerCard({ player, align = 'left' }) {
   );
 }
 
-export default function MatchupScreen({ player1, player2, visible, onComplete }) {
-  useEffect(() => {
-    if (!visible) return;
-    const id = setTimeout(() => {
-      onComplete?.();
-    }, 3000);
-    return () => clearTimeout(id);
-  }, [visible, onComplete]);
-
+export default function MatchupScreen({ player1, player2, visible }) {
   return (
     <AnimatePresence>
       {visible && (
