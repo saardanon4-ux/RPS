@@ -9,11 +9,18 @@ RUN npm run build
 # Production stage - Node server + static client
 FROM node:20-alpine
 WORKDIR /app
+
+# Install server dependencies
 COPY server/package*.json ./
 RUN npm ci --omit=dev
+
+# Copy server source and built client
 COPY server/ ./
 COPY --from=client-builder /app/client/dist ./client/dist
+
 EXPOSE 3000
 ENV NODE_ENV=production
 ENV PORT=3000
-CMD ["node", "index.js"]
+
+# Ensure Prisma Client is generated in the runtime image before starting
+CMD ["sh", "-c", "npx prisma generate && node index.js"]
