@@ -78,13 +78,13 @@ export default function App() {
     <div className="h-[100dvh] bg-gradient-to-b from-slate-900 via-indigo-950/50 to-slate-900 text-white flex flex-col overflow-hidden">
       {opponentLeft && (
         <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center gap-4 px-4 py-3 bg-amber-900/90 border-b border-amber-600/50 backdrop-blur-sm">
-          <span className="text-amber-200 font-medium">The other player left the room.</span>
+          <span className="text-amber-200 font-medium">השחקן השני עזב את החדר.</span>
           <button
             type="button"
             onClick={leaveRoom}
             className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-medium transition-colors"
           >
-            Leave room
+            צא מהחדר
           </button>
         </div>
       )}
@@ -106,9 +106,9 @@ export default function App() {
             />
           </div>
           <div className="flex justify-between px-2 py-1 text-xs font-bold text-stone-400">
-            <span>{setupTimer ?? 0}s</span>
+            <span>{setupTimer ?? 0} שניות</span>
             <span className={progress > 66 ? 'text-green-400' : progress > 33 ? 'text-yellow-400' : 'text-red-400'}>
-              {progress > 66 ? 'Setup' : progress > 33 ? 'Hurry!' : 'Almost out!'}
+              {progress > 66 ? 'שלב הכנה' : progress > 33 ? 'להזדרז!' : 'כמעט נגמר הזמן!'}
             </span>
           </div>
         </div>
@@ -121,7 +121,7 @@ export default function App() {
               className="text-xl font-bold tracking-tight text-white/90"
               style={{ fontFamily: "'Orbitron', sans-serif" }}
             >
-              RPS STRATEGO
+              אחסן, נייר ומספריים
             </h1>
             <button
               type="button"
@@ -129,7 +129,7 @@ export default function App() {
               className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/20 text-xs font-semibold text-white/90 shadow-sm"
             >
               <span className="text-amber-300 text-base">?</span>
-              <span className="whitespace-nowrap">איך משחקים? / How to play</span>
+              <span className="whitespace-nowrap">איך משחקים?</span>
             </button>
           </div>
           <div className="flex-1 flex justify-end min-w-0">

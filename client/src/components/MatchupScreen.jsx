@@ -2,8 +2,8 @@ import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function PlayerCard({ player, align = 'left' }) {
-  const name = player?.name ?? 'Player';
-  const teamName = player?.teamName ?? 'Unknown Team';
+  const name = player?.name ?? 'שחקן';
+  const teamName = player?.teamName ?? 'קבוצה לא ידועה';
   const teamColor = player?.teamColor ?? '#64748b';
 
   const isLeft = align === 'left';
@@ -91,7 +91,7 @@ export default function MatchupScreen({ player1, player2, visible, onComplete })
                 VS
               </motion.span>
               <span className="text-[10px] sm:text-xs uppercase tracking-[0.3em] text-white/60">
-                SUDDEN MATCHUP
+                מפגש מהיר
               </span>
             </motion.div>
 

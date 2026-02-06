@@ -6,20 +6,20 @@ dotenv.config();
 const prisma = new PrismaClient();
 
 const teams = [
-  { name: 'Maccabi Haifa', color: '#006633' },       // Green
-  { name: 'Maccabi Tel Aviv', color: '#FEE500' },    // Yellow
-  { name: "Hapoel Be'er Sheva", color: '#E61B23' },  // Red
-  { name: 'Beitar Jerusalem', color: '#333333' },    // Black/Yellow (Dark base)
-  { name: 'Hapoel Tel Aviv', color: '#D81E05' },     // Red
-  { name: 'Maccabi Netanya', color: '#FFD700' },     // Yellow
-  { name: 'Hapoel Haifa', color: '#FF0000' },        // Red
-  { name: 'Bnei Sakhnin', color: '#A61015' },        // Red
-  { name: 'Maccabi Petah Tikva', color: '#005DAA' }, // Blue
-  { name: 'Hapoel Jerusalem', color: '#D4001F' },    // Red/Black
-  { name: 'Hapoel Hadera', color: '#BF1E2D' },       // Red
-  { name: 'Maccabi Bnei Reineh', color: '#FFCC00' }, // Yellow/Blue
-  { name: 'Ironi Kiryat Shmona', color: '#0054A6' }, // Blue
-  { name: 'Ironi Tiberias', color: '#0000FF' },      // Blue
+  { name: 'מכבי חיפה', color: '#006633' },          // Green
+  { name: 'מכבי תל אביב', color: '#FEE500' },       // Yellow
+  { name: 'הפועל באר שבע', color: '#E61B23' },      // Red
+  { name: 'בית"ר ירושלים', color: '#333333' },      // Black/Yellow (Dark base)
+  { name: 'הפועל תל אביב', color: '#D81E05' },      // Red
+  { name: 'מכבי נתניה', color: '#FFD700' },         // Yellow
+  { name: 'הפועל חיפה', color: '#FF0000' },         // Red
+  { name: 'בני סכנין', color: '#A61015' },          // Red
+  { name: 'מכבי פתח תקווה', color: '#005DAA' },    // Blue
+  { name: 'הפועל ירושלים', color: '#D4001F' },      // Red/Black
+  { name: 'הפועל חדרה', color: '#BF1E2D' },         // Red
+  { name: 'מכבי בני ריינה', color: '#FFCC00' },    // Yellow/Blue
+  { name: 'עירוני קרית שמונה', color: '#0054A6' }, // Blue
+  { name: 'עירוני טבריה', color: '#0000FF' },       // Blue
 ];
 
 async function main() {

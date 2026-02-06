@@ -58,69 +58,12 @@ const STEPS = {
       ],
     },
   ],
-  en: [
-    {
-      id: 'join',
-      title: 'Step 1 — Join a Room',
-      body: [
-        'On the welcome screen choose a player name and enter an existing Room ID, or leave it empty to create a new room.',
-        'Share the Room ID with your friend — once both of you are inside, the game begins.',
-        'You always see your units at the bottom of the board; your opponent is at the top.',
-      ],
-    },
-    {
-      id: 'setup',
-      title: 'Step 2 — Setup Your Army',
-      body: [
-        'The board is 6×6. Each player can place pieces only on their own two back rows (bottom rows for you, top rows for your opponent).',
-        'You must place exactly 12 pieces: one Flag (🚩), one Trap (🪤), and ten combat units of Rock / Paper / Scissors in any mix.',
-        'There is a setup timer. When it expires, any empty spots are auto-filled for you with a smart layout.',
-      ],
-    },
-    {
-      id: 'turns',
-      title: 'Step 3 — Taking a Turn',
-      body: [
-        'On your turn, choose one of your Rock / Paper / Scissors units (not the Flag or Trap) and move it one tile up / down / left / right.',
-        'You may move into an empty square or attack an opponent’s square. Enemy pieces stay hidden until they fight or are revealed.',
-        'You have 30 seconds per turn. If you do nothing, the server picks a random legal move for you and passes the turn.',
-      ],
-    },
-    {
-      id: 'combat',
-      title: 'Step 4 — Regular RPS Combat',
-      body: [
-        'When you move into an enemy square, a Rock–Paper–Scissors battle is resolved:',
-        '🪨 Rock beats ✂️ Scissors, ✂️ Scissors beats 📄 Paper, 📄 Paper beats 🪨 Rock.',
-        'If you win, your unit moves onto that square; if you lose, your unit is removed; if you step on a Trap 🪤 your unit dies and the trap stays.',
-      ],
-    },
-    {
-      id: 'tie',
-      title: 'Step 5 — Sudden Death Tie‑Breaker',
-      body: [
-        'If both units are the same type (e.g. Rock vs Rock), a Sudden Death tie‑breaker starts.',
-        'Both players secretly choose Rock / Paper / Scissors within 7 seconds. If a player does not choose, a random option is picked for them.',
-        'If it is still a tie, a short Draw is shown and another Sudden Death round immediately starts until there is a clear winner.',
-      ],
-    },
-    {
-      id: 'win',
-      title: 'How Do You Win?',
-      body: [
-        'Capture your opponent’s Flag 🚩 by moving onto its square.',
-        'Or eliminate all of your opponent’s movable Rock / Paper / Scissors units so they have no legal moves left.',
-        'If your opponent leaves the room or disconnects for too long, you are awarded a win by disconnect.',
-      ],
-    },
-  ],
 };
 
 export default function HowToPlayModal({ open, onClose }) {
-  const [lang, setLang] = useState('he');
   const [index, setIndex] = useState(0);
 
-  const steps = useMemo(() => STEPS[lang] ?? STEPS.he, [lang]);
+  const steps = useMemo(() => STEPS.he, []);
   const current = steps[index] ?? steps[0];
 
   const canPrev = index > 0;
@@ -133,7 +76,7 @@ export default function HowToPlayModal({ open, onClose }) {
     onClose?.();
   };
 
-  const dir = lang === 'he' ? 'rtl' : 'ltr';
+  const dir = 'rtl';
 
   return (
     <AnimatePresence>
@@ -164,39 +107,15 @@ export default function HowToPlayModal({ open, onClose }) {
               </span>
               <div className="flex flex-col">
                 <span className="text-sm font-semibold text-amber-300">
-                  {lang === 'he' ? 'איך משחקים?' : 'How to Play'}
+                  איך משחקים?
                 </span>
                 <span className="text-[11px] text-white/60">
-                  {lang === 'he'
-                    ? 'גלול עם החצים בין השלבים'
-                    : 'Use the arrows to move between steps'}
+                  גלול עם החצים בין השלבים
                 </span>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setLang('he')}
-                className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
-                  lang === 'he'
-                    ? 'bg-amber-400 text-slate-900 border-amber-300'
-                    : 'bg-white/5 text-white/80 border-white/20'
-                }`}
-              >
-                עברית
-              </button>
-              <button
-                type="button"
-                onClick={() => setLang('en')}
-                className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
-                  lang === 'en'
-                    ? 'bg-amber-400 text-slate-900 border-amber-300'
-                    : 'bg-white/5 text-white/80 border-white/20'
-                }`}
-              >
-                English
-              </button>
               <button
                 type="button"
                 onClick={handleClose}
@@ -271,13 +190,7 @@ export default function HowToPlayModal({ open, onClose }) {
               onClick={() => (canNext ? setIndex((i) => Math.min(steps.length - 1, i + 1)) : handleClose())}
               className="px-3 py-1.5 rounded-full bg-amber-400 text-slate-900 text-xs font-semibold hover:bg-amber-300 transition-colors"
             >
-              {canNext
-                ? lang === 'he'
-                  ? 'הבא ⟶'
-                  : 'Next ⟶'
-                : lang === 'he'
-                  ? 'סגור'
-                  : 'Close'}
+              {canNext ? 'הבא ⟶' : 'סגור'}
             </button>
           </div>
         </motion.div>

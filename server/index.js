@@ -9,6 +9,7 @@ import { PrismaClient } from '@prisma/client';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import { register as registerUser, login as loginUser } from './controllers/authController.js';
+import { saveGameResult } from './controllers/gameController.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const prisma = new PrismaClient();
@@ -234,6 +235,8 @@ function resolveTieBreaker(room) {
       if (!p.socketId) return;
       io.to(p.socketId).emit('game_over', { winnerId: gameOver, flagCapture: false });
     });
+    // Persist result when tie-breaker concludes the game
+    recordGameResultForRoom(room, gameOver);
   }
   // Done resolving this encounter.
   tb.isResolving = false;
@@ -451,6 +454,8 @@ function executeMove(room, fromRow, fromCol, toRow, toCol, movingPlayerId) {
       if (!p.socketId) return;
       io.to(p.socketId).emit('game_over', { winnerId: gameOver, flagCapture: !combatResult });
     });
+    // Persist result for completed game
+    recordGameResultForRoom(room, gameOver);
   }
   return 'ok';
 }
@@ -505,6 +510,27 @@ function transitionToPlaying(room) {
 
 const rooms = new Map();
 
+async function recordGameResultForRoom(room, winnerId = null, explicitPlayerIds = null) {
+  try {
+    if (!room || room.resultPersisted) return;
+
+    let playerIds = explicitPlayerIds;
+    if (!playerIds) {
+      const uniqueIds = Array.from(new Set((room.players || []).map((p) => p.id).filter((id) => id != null)));
+      if (uniqueIds.length !== 2) return;
+      playerIds = uniqueIds;
+    }
+
+    const [playerAId, playerBId] = playerIds;
+
+    room.resultPersisted = true;
+    await saveGameResult(playerAId, playerBId, winnerId);
+  } catch (err) {
+    // Do not crash the game flow if persistence fails
+    console.error('Failed to record game result:', err);
+  }
+}
+
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth && socket.handshake.auth.token;
@@ -531,6 +557,9 @@ io.use(async (socket, next) => {
       groupId: user.groupId,
       teamName: user.group?.name || null,
       teamColor: user.group?.color || null,
+      wins: user.wins ?? 0,
+      losses: user.losses ?? 0,
+      draws: user.draws ?? 0,
     };
     next();
   } catch (err) {
@@ -548,7 +577,13 @@ io.on('connection', (socket) => {
     const rid = roomId || `room-${Date.now()}`;
     let room = rooms.get(rid);
     if (!room) {
-      room = { roomId: rid, players: [], phase: 'WAITING', setupInterval: null };
+      room = {
+        roomId: rid,
+        players: [],
+        phase: 'WAITING',
+        setupInterval: null,
+        resultPersisted: false,
+      };
       rooms.set(rid, room);
     }
 
@@ -569,8 +604,26 @@ io.on('connection', (socket) => {
       socket.emit('joined_room', {
         roomId: rid,
         playerId: pid,
-        player: { id: pid, name: player.name, side: player.side, teamName: player.teamName, teamColor: player.teamColor },
-        players: room.players.map((p) => ({ id: p.id, name: p.name, side: p.side, teamName: p.teamName, teamColor: p.teamColor })),
+        player: {
+          id: pid,
+          name: player.name,
+          side: player.side,
+          teamName: player.teamName,
+          teamColor: player.teamColor,
+          wins: player.wins,
+          losses: player.losses,
+          draws: player.draws,
+        },
+        players: room.players.map((p) => ({
+          id: p.id,
+          name: p.name,
+          side: p.side,
+          teamName: p.teamName,
+          teamColor: p.teamColor,
+          wins: p.wins,
+          losses: p.losses,
+          draws: p.draws,
+        })),
       });
       room.players.forEach((p) => {
         if (p.socketId) io.to(p.socketId).emit('room_updated', {
@@ -581,6 +634,9 @@ io.on('connection', (socket) => {
             side: x.side,
             teamName: x.teamName,
             teamColor: x.teamColor,
+            wins: x.wins,
+            losses: x.losses,
+            draws: x.draws,
           })),
         });
       });
@@ -628,6 +684,9 @@ io.on('connection', (socket) => {
     const playerName = socket.user?.username || `Player ${room.players.length + 1}`;
     const teamName = socket.user?.teamName || null;
     const teamColor = socket.user?.teamColor || null;
+    const wins = socket.user?.wins ?? 0;
+    const losses = socket.user?.losses ?? 0;
+    const draws = socket.user?.draws ?? 0;
 
     const player = {
       id: pid,
@@ -636,6 +695,9 @@ io.on('connection', (socket) => {
       side: room.players.length === 0 ? 'bottom' : 'top',
       teamName,
       teamColor,
+      wins,
+      losses,
+      draws,
     };
     room.players.push(player);
 
@@ -646,8 +708,26 @@ io.on('connection', (socket) => {
     socket.emit('joined_room', {
       roomId: rid,
       playerId: pid,
-      player: { id: pid, name: player.name, side: player.side, teamName: player.teamName, teamColor: player.teamColor },
-      players: room.players.map((p) => ({ id: p.id, name: p.name, side: p.side, teamName: p.teamName, teamColor: p.teamColor })),
+      player: {
+        id: pid,
+        name: player.name,
+        side: player.side,
+        teamName: player.teamName,
+        teamColor: player.teamColor,
+        wins: player.wins,
+        losses: player.losses,
+        draws: player.draws,
+      },
+      players: room.players.map((p) => ({
+        id: p.id,
+        name: p.name,
+        side: p.side,
+        teamName: p.teamName,
+        teamColor: p.teamColor,
+        wins: p.wins,
+        losses: p.losses,
+        draws: p.draws,
+      })),
     });
     room.players.forEach((p) => {
       if (p.socketId) io.to(p.socketId).emit('room_updated', {
@@ -658,6 +738,9 @@ io.on('connection', (socket) => {
           side: x.side,
           teamName: x.teamName,
           teamColor: x.teamColor,
+          wins: x.wins,
+          losses: x.losses,
+          draws: x.draws,
         })),
       });
     });
@@ -685,6 +768,9 @@ io.on('connection', (socket) => {
           side: x.side,
           teamName: x.teamName,
           teamColor: x.teamColor,
+          wins: x.wins,
+          losses: x.losses,
+          draws: x.draws,
         })),
         grid: gridForPlayer,
         setupReady: room.setupReady ?? {},
@@ -696,7 +782,10 @@ io.on('connection', (socket) => {
 
     if (room.phase === 'PLAYING' && room.gameState) {
       const sanitized = sanitizeGameStateForPlayer(room.gameState, socket.playerId);
-      socket.emit('game_start', { gameState: { ...sanitized, turnStartTime: room.turnStartTime }, phase: 'PLAYING' });
+      socket.emit('game_start', {
+        gameState: { ...sanitized, turnStartTime: room.turnStartTime },
+        phase: 'PLAYING',
+      });
     }
 
     if (room.phase === 'TIE_BREAKER' && room.tieBreaker) {
@@ -904,6 +993,7 @@ io.on('connection', (socket) => {
         if (room.setupInterval) clearInterval(room.setupInterval);
         if (room.tieBreaker?.timeoutId) clearTimeout(room.tieBreaker.timeoutId);
         const leaverId = socket.playerId;
+        const previousPlayers = [...room.players];
         room.players = room.players.filter((p) => p.id !== leaverId);
         const remaining = room.players[0];
         if (!remaining) {
@@ -919,6 +1009,10 @@ io.on('connection', (socket) => {
             room.turnTimerInterval = null;
           }
           io.to(remaining.socketId).emit('game_over', { winnerId: remaining.id, flagCapture: false, disconnectWin: true });
+          const explicitIds = previousPlayers.map((p) => p.id).filter((id) => id != null);
+          if (explicitIds.length === 2) {
+            recordGameResultForRoom(room, remaining.id, explicitIds);
+          }
         }
       }
       socket.leave(socket.roomId);
@@ -969,6 +1063,10 @@ io.on('connection', (socket) => {
               io.to(q.socketId).emit('room_updated', { roomId: r.roomId, players: r.players.map((x) => ({ id: x.id, name: x.name, side: x.side })) });
               io.to(q.socketId).emit('game_over', { winnerId: remaining.id, flagCapture: false, disconnectWin: true });
             });
+            const explicitIds = [player.id, remaining.id].filter((id) => id != null);
+            if (explicitIds.length === 2) {
+              recordGameResultForRoom(r, remaining.id, explicitIds);
+            }
           }, DISCONNECT_GRACE_MS);
         }
       }
@@ -1028,6 +1126,66 @@ app.get('/auth/groups', async (req, res) => {
   } catch (err) {
     console.error('Error fetching groups', err);
     res.status(500).json({ error: 'Failed to load groups' });
+  }
+});
+
+app.get('/api/leaderboard', async (req, res) => {
+  try {
+    const topPlayers = await prisma.user.findMany({
+      orderBy: { wins: 'desc' },
+      take: 10,
+      select: {
+        id: true,
+        username: true,
+        wins: true,
+        losses: true,
+        draws: true,
+        group: {
+          select: { id: true, name: true, color: true, totalWins: true, totalLosses: true, totalDraws: true },
+        },
+      },
+    });
+
+    const topGroups = await prisma.group.findMany({
+      orderBy: { totalWins: 'desc' },
+      take: 10,
+      select: {
+        id: true,
+        name: true,
+        color: true,
+        totalWins: true,
+        totalLosses: true,
+        totalDraws: true,
+      },
+    });
+
+    res.json({ players: topPlayers, groups: topGroups });
+  } catch (err) {
+    console.error('Error building leaderboard', err);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
+app.get('/api/rooms/active', (req, res) => {
+  try {
+    const activeRooms = [];
+    rooms.forEach((room) => {
+      if (!room || (room.phase !== 'WAITING' && room.phase !== 'SETUP')) return;
+      const host = (room.players || [])[0];
+      if (!host) return;
+      activeRooms.push({
+        roomId: room.roomId,
+        phase: room.phase,
+        playerName: host.name,
+        teamName: host.teamName,
+        teamColor: host.teamColor,
+        playersCount: room.players.length,
+      });
+    });
+    res.json(activeRooms);
+  } catch (err) {
+    console.error('Error listing active rooms', err);
+    res.status(500).json({ error: 'Failed to load active rooms' });
   }
 });
 

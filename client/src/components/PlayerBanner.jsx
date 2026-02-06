@@ -32,12 +32,12 @@ export default function PlayerBanner({ nickname, isOpponent, isTheirTurn, positi
       <Avatar name={nickname} isOpponent={isOpponent} />
       <div className={`flex flex-col ${position === 'bottom' ? 'items-end' : 'items-start'}`}>
         <span className="text-white/90 font-semibold text-sm truncate max-w-[120px]">
-          {nickname || (isOpponent ? 'Opponent' : 'You')}
+          {nickname || (isOpponent ? 'יריב' : 'אתה')}
         </span>
         {isTheirTurn && (
           <span className="text-amber-400 text-xs font-medium flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-            {isOpponent ? 'Their turn' : 'Your turn'}
+            {isOpponent ? 'התור שלהם' : 'התור שלך'}
           </span>
         )}
       </div>

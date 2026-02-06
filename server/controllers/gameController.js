@@ -17,12 +17,106 @@ export async function saveGameResult(playerAId, playerBId, winnerId) {
     throw new Error('Invalid player ids for game result');
   }
 
-  return prisma.game.create({
-    data: {
-      playerAId: a,
-      playerBId: b,
-      winnerId: w,
-    },
+  return prisma.$transaction(async (tx) => {
+    const game = await tx.game.create({
+      data: {
+        playerAId: a,
+        playerBId: b,
+        winnerId: w,
+      },
+    });
+
+    // Load minimal user info for stats updates
+    const users = await tx.user.findMany({
+      where: { id: { in: [a, b] } },
+      select: { id: true, groupId: true },
+    });
+
+    const userMap = new Map(users.map((u) => [u.id, u]));
+    const userA = userMap.get(a);
+    const userB = userMap.get(b);
+
+    const ops = [];
+
+    if (w == null) {
+      // Draw: both players + their groups get a draw
+      if (userA) {
+        ops.push(
+          tx.user.update({
+            where: { id: userA.id },
+            data: { draws: { increment: 1 } },
+          }),
+        );
+        if (userA.groupId != null) {
+          ops.push(
+            tx.group.update({
+              where: { id: userA.groupId },
+              data: { totalDraws: { increment: 1 } },
+            }),
+          );
+        }
+      }
+      if (userB) {
+        ops.push(
+          tx.user.update({
+            where: { id: userB.id },
+            data: { draws: { increment: 1 } },
+          }),
+        );
+        if (userB.groupId != null) {
+          ops.push(
+            tx.group.update({
+              where: { id: userB.groupId },
+              data: { totalDraws: { increment: 1 } },
+            }),
+          );
+        }
+      }
+    } else {
+      const winnerUser = userMap.get(w);
+      const loserId = w === a ? b : a;
+      const loserUser = userMap.get(loserId);
+
+      if (winnerUser) {
+        ops.push(
+          tx.user.update({
+            where: { id: winnerUser.id },
+            data: { wins: { increment: 1 } },
+          }),
+        );
+        if (winnerUser.groupId != null) {
+          ops.push(
+            tx.group.update({
+              where: { id: winnerUser.groupId },
+              data: { totalWins: { increment: 1 } },
+            }),
+          );
+        }
+      }
+
+      if (loserUser) {
+        ops.push(
+          tx.user.update({
+            where: { id: loserUser.id },
+            data: { losses: { increment: 1 } },
+          }),
+        );
+        if (loserUser.groupId != null) {
+          ops.push(
+            tx.group.update({
+              where: { id: loserUser.groupId },
+              data: { totalLosses: { increment: 1 } },
+            }),
+          );
+        }
+      }
+    }
+
+    if (ops.length > 0) {
+      await Promise.all(ops);
+    }
+
+    return game;
   });
 }
 

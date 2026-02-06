@@ -15,18 +15,24 @@ datasource db {
 }
 
 model Group {
-  id    Int    @id @default(autoincrement())
-  name  String @unique
-  color String @default("#000000")
-  users User[]
+  id          Int    @id @default(autoincrement())
+  name        String @unique
+  color       String @default("#000000")
+  totalWins   Int    @default(0)
+  totalLosses Int    @default(0)
+  totalDraws  Int    @default(0)
+  users       User[]
 }
 
 model User {
-  id            Int     @id @default(autoincrement())
-  username      String  @unique
-  password      String
-  groupId       Int?
-  group         Group?  @relation(fields: [groupId], references: [id])
+  id             Int     @id @default(autoincrement())
+  username       String  @unique
+  password       String
+  wins           Int     @default(0)
+  losses         Int     @default(0)
+  draws          Int     @default(0)
+  groupId        Int?
+  group          Group?  @relation(fields: [groupId], references: [id])
   gamesAsPlayerA Game[] @relation("gamesAsPlayerA")
   gamesAsPlayerB Game[] @relation("gamesAsPlayerB")
   gamesWon       Game[] @relation("gamesWon")

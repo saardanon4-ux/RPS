@@ -1,9 +1,12 @@
 import { motion } from 'framer-motion';
 
 function PlayerSlot({ player, isCurrentTurn, isLocal, emoji }) {
-  const name = player?.name || (isLocal ? 'You' : 'Opponent');
+  const name = player?.name || (isLocal ? 'אתה' : 'יריב');
   const teamName = player?.teamName || null;
   const teamColor = player?.teamColor || null;
+  const wins = player?.wins ?? 0;
+  const losses = player?.losses ?? 0;
+  const draws = player?.draws ?? 0;
   const initial = name ? name.charAt(0).toUpperCase() : '?';
   return (
     <motion.div
@@ -26,7 +29,7 @@ function PlayerSlot({ player, isCurrentTurn, isLocal, emoji }) {
       >
         {initial}
       </div>
-      <div className="flex flex-col gap-0.5 max-w-[120px]">
+      <div className="flex flex-col gap-0.5 max-w-[140px]">
         <span
           className={`font-semibold text-sm truncate ${
             isCurrentTurn ? 'text-emerald-300' : 'text-white/80'
@@ -44,6 +47,9 @@ function PlayerSlot({ player, isCurrentTurn, isLocal, emoji }) {
             <span>{teamName}</span>
           </span>
         )}
+        <span className="text-[10px] text-white/60 truncate">
+          {wins} נצחונות / {losses} הפסדים / {draws} תיקו
+        </span>
         {emoji && (
           <span className="text-lg leading-none drop-shadow-[0_0_8px_rgba(0,0,0,0.6)] animate-bounce">
             {emoji}
