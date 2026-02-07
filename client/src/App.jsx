@@ -5,6 +5,7 @@ import GameHUD from './components/GameHUD';
 import SetupBoard from './components/SetupBoard';
 import HowToPlayModal from './components/HowToPlayModal';
 import MatchupScreen from './components/MatchupScreen';
+import AssetPreloader from './components/AssetPreloader';
 import { useGame } from './context/GameContext';
 
 const EMOJI_OPTIONS = ['🤫', '✂️', '🧠', '💣', '😂', '😈'];
@@ -52,6 +53,7 @@ export default function App() {
   const turnStartTime = gameState?.turnStartTime;
   const [showHowTo, setShowHowTo] = useState(false);
   const [showMatchup, setShowMatchup] = useState(false);
+  const [assetsLoaded, setAssetsLoaded] = useState(false);
   useEffect(() => {
     if (!turnStartTime) return;
     const tick = () => {
@@ -78,6 +80,10 @@ export default function App() {
 
   if (!inRoom) {
     return <WelcomeScreen />;
+  }
+
+  if (!assetsLoaded) {
+    return <AssetPreloader onComplete={() => setAssetsLoaded(true)} />;
   }
 
   return (
