@@ -65,6 +65,10 @@
 ### Connectivity, Turn Timer & Rematch
 
 - **Turn timeout:** if a player does not move within 30 seconds, the server auto‑executes a random valid move for them and passes the turn.
+- **Server-side turn enforcement (global game loop):**
+  - A **global** `setInterval` runs every 1s and calls `checkExpiredTurns()`.
+  - Each active room uses `turnDeadline` (set when turn starts and after each move/tie‑resolve).
+  - When `Date.now() > turnDeadline`: server either performs a **random valid move** for the current player or, if no moves possible, **declares the other player winner** and persists the result. Both clients get state via existing `emitGameState` / `game_over` / `combat_event`.
 - **Disconnect grace period:**
   - On `disconnect`, the server marks the player as temporarily offline and starts an **8s grace timer** (`DISCONNECT_GRACE_MS`).
   - If the player reconnects (same persistent player ID) before the timer fires, the game continues normally.
@@ -84,32 +88,54 @@
     - `no_units`: "VICTORY! — 🏆 YOU WIN! 🏆"
   - Uses confetti effects and pulsing emojis for a more satisfying win moment.
 
+### Session Additions: Lobby, Leaderboards, Kits, Preloader & Room Fixes
+
+- **WelcomeScreen tabbed UI (authenticated):**
+  - **לובי (Lobby):** Active rooms from `/api/rooms/active`, filter "חפש לפי קבוצה", "צור חדר חדש" when no rooms; room ID input and join.
+  - **טבלאות (Leaderboard):** Toggle **שחקנים** / **קבוצות**; data from `/api/stats/players` and `/api/stats/groups`; **minimum 8 games** to be ranked (rank column shows "–" for unranked; footer note in Hebrew). Sorted: ranked first, then win rate desc, then wins desc.
+  - **אזור אישי (Personal):** Player stats panel (Total Games, Wins, Losses, Win %, streak; **Draws removed**); head‑to‑head table (נ/ה only). Logout in top‑right corner.
+- **Room is Full / ghost connections fixed:**
+  - `join_room`: Debug logs (roomId, adapter size, Map state); **ghost pruning** — remove players whose socket ID no longer exists in `io.sockets.sockets`; if room empty after prune, delete and recreate; emit `room_update`.
+  - `disconnect`: Remove player from custom `rooms` Map after grace; if room empty, delete key and emit `room_update`; clear timers. Client listens for `room_update` and refetches lobby list (`roomListVersion` in context).
+- **Kit-based piece visuals (GamePiece.jsx):**
+  - Asset path: `/assets/units/${kit}.${type}.png` (e.g. `red.rock.png`, `whiteandred.hidden.png`). Kits: red, blue, green, yellow, whiteandred, blackandred, blackandyellow, lightblue.
+  - **Clash resolution:** `getClashKit(color)` maps same-kit opponent to away kit (e.g. red↔whiteandred, yellow↔blackandyellow). My pieces always use my kit; opponent uses their kit unless clash, then away kit. `toKitName()` normalizes hex to a kit name for compatibility.
+  - Type: `(isMine || piece.revealed) ? piece.type : 'hidden'`. Exported `isColorClash(myTeamColor, opponentTeamColor)` for Board glow.
+- **GameHUD (header):** Draws removed; single **🏆 Win%** badge; compact layout, truncate, `min-w-0`; **avatar clash** — when `forceColorSwap` (same team color), opponent avatar uses gold styling so it’s distinct.
+- **AssetPreloader:** New component preloads all unit images (`ASSET_COLORS × ASSET_TYPES`). Shown in App when in room until `onComplete`; progress bar and "מכין את הלוח...". Integrated so game board appears only after preload (or after 500ms delay post-load).
+- **Board performance:** `BoardCell` wrapped in `React.memo` with custom `areCellPropsEqual` so cells don’t re-render when only the global turn timer updates; `handleCellClick` in `useCallback`.
+- **Seed:** Teams seeded with **asset prefix** in `color` (e.g. `red`, `whiteandred`); `totalWins`/`totalLosses`; Hebrew comments and emoji console output. Prisma schema uses `totalWins`/`totalLosses` on Group.
+- **Persistence & stats APIs (already wired):** Game results persisted via `recordGameResultForRoom`; `/api/rooms/active`, `/api/stats/players`, `/api/stats/groups`, `/api/stats/me`, `/api/stats/headtohead`; leaderboard and personal stats UI in WelcomeScreen tabs.
+
 ---
 
 ## 2. Technical Changes (Key Files)
 
 | File | Changes |
 |------|---------|
-| `client/src/components/WelcomeScreen.jsx` | Glassmorphism, RTL Hebrew auth + lobby screen; Login/Register toggle with username/password and team selection; "Connected as" banner; authenticated room join. |
-| `client/src/components/GameHUD.jsx` | Single top HUD with players and turn timer; now shows team name and colored indicator per player. |
+| `client/src/components/WelcomeScreen.jsx` | Glassmorphism, RTL Hebrew auth; **tabbed UI:** לובי (active rooms, filter, create room), טבלאות (players/groups leaderboard with 8-game min), אזור אישי (stats, no Draws); logout in corner. |
+| `client/src/components/GameHUD.jsx` | Single top HUD; team name + colored indicator; **Draws removed**, compact **🏆 Win%** badge; **avatar clash** (forceColorSwap = gold when same team color); truncate, min-w-0. |
+| `client/src/components/GamePiece.jsx` | **Kit-based assets:** `/assets/units/${kit}.${type}.png`; `getClashKit()` for clash; `toKitName()`; `isColorClash()` export; selection ring. |
+| `client/src/components/AssetPreloader.jsx` | **New.** Preloads all unit images by color×type; progress bar; `onComplete`; used before showing game board. |
+| `client/src/components/Board.jsx` | 6×6 layout; **BoardCell** memoized with custom `areCellPropsEqual`; `useCallback` for cell click; passes `piece`, `myTeamColor`, `opponentTeamColor` to GamePiece; `isColorClash` for displayColor/glow. |
+| `client/src/components/PlayerStatsPanel.jsx` | **Draws removed** from stats grid and head‑to‑head column (נ/ה only). |
 | `client/src/components/MatchupScreen.jsx` | New FIFA‑style matchup overlay: big team‑colored avatars, names, team names, and animated VS intro. |
-| `client/src/components/Board.jsx` | Stable 6×6 layout with `aspect-square`; bottom‑perspective rotation; fixed enemy rotation; combat target highlighting; draw overlays; pieces now glow using each player’s real team color. |
 | `client/src/components/SetupBoard.jsx` | Setup board styling; dark theme and rotation for top player setup. |
 | `client/src/components/CombatModal.jsx` | Rich RPS animations; clear "Your unit" vs "Opponent" labels; visualized draw (same icon vs same icon). |
 | `client/src/components/TieBreakerModal.jsx` | Sudden Death UI; shows both weapon icons; refined tie messaging; preserves full 7s for manual choices. |
 | `client/src/components/FlagCaptureCelebration.jsx` | Unified victory animation with `capture_flag.mp4`; hides Rematch on `disconnectWin`; uses `winType` and `disconnectWin` to adjust copy/UX. |
-| `client/src/App.jsx` | Uses `WelcomeScreen` when not in a room; uses `GameHUD`; tracks per‑turn countdown and opponent‑left banner; renders `MatchupScreen` when both players are ready; Emoji bar. |
+| `client/src/App.jsx` | `WelcomeScreen` when not in room; **AssetPreloader** when in room until `assetsLoaded`; then GameHUD, MatchupScreen, Emoji bar, Board/SetupBoard. |
 | `client/public/manifest.webmanifest` | PWA metadata (name `"אחסן, נייר ומספריים"`, icons, theme/background colors). |
 | `client/public/sw.js` | Minimal service worker to enable installability (no offline caching yet). |
-| `client/index.html` | Orbitron font; PWA meta tags (theme‑color, manifest, Apple PWA tags, touch icon). |
+| `client/index.html` | Orbitron font; PWA meta tags; **preload** for legacy unit images (unit-rock, unit-paper, etc.). |
 | `client/src/main.jsx` | Registers the service worker on `window.load`. |
-| `client/src/context/GameContext.jsx` | Auth state (`authUser`/`authToken`), JWT hydration, Socket.IO connection with `auth.token`, turn timers, combat/tie‑breaker orchestration, disconnect handling, emoji reactions, and simplified `joinRoom` that trusts server‑side identity. |
+| `client/src/context/GameContext.jsx` | Auth state; **roomListVersion** + `room_update` listener for lobby refetch; Socket.IO with `auth.token`; turn timers, combat/tie‑breaker, disconnect, emoji, `joinRoom`. |
 | `server/prisma/schema.prisma` | Prisma models for `Group` (with team color), `User` (with group and game relations) and `Game` (playerA/B, winner, createdAt). |
-| `server/prisma/seed.js` | Seeds Israeli Premier League teams with canonical colors into `Group`. |
+| `server/prisma/seed.js` | Seeds Israeli Premier League teams with **asset prefix** in `color` (red, whiteandred, blue, etc.); `totalWins`/`totalLosses`; Hebrew comments; emoji console (🗑️ 🌱 ✅). |
 | `server/controllers/authController.js` | `register` + `login` with bcrypt hashing, JWT issuance, and group assignment via Prisma. |
 | `server/controllers/statsController.js` | Functions for user stats and head‑to‑head records (wins / losses / draws). |
 | `server/controllers/gameController.js` | `saveGameResult` for persisting game outcomes. |
-| `server/index.js` | Express + Socket.IO server; CORS configured via `CLIENT_URL`; Socket.IO JWT middleware; secure `join_room` using `socket.user`; game logic (turn timeout, tie‑breaker, disconnect grace, etc.); `/auth/login`, `/auth/register`, `/auth/groups`, `/health`. |
+| `server/index.js` | Express + Socket.IO; JWT middleware; **join_room:** debug logs, ghost pruning, `turnDeadline`; **disconnect:** remove player from `rooms` Map, delete empty room, emit `room_update`; **global** `checkExpiredTurns()` every 1s; `/api/rooms/active`, `/api/stats/players`, `/api/stats/groups` (gamesPlayed, isRanked ≥8, sort); `/auth/*`, `/health`. |
 | `Dockerfile` | Multi‑stage Debian (`node:20-slim`) build: builds client, installs server deps, ensures OpenSSL installed; runs `npx prisma generate && node index.js` at startup. |
 
 ---
@@ -131,17 +157,17 @@
   - Ensure the flow is always: **Battle → Draw shown once → immediate return to choice → resolve**.
   - Verify there is no perceived "lost seconds" from overlapping delays and timers, especially on mobile.
 
-### 3.3 Persistence / Data Layer (Partially Implemented)
+### 3.3 Persistence / Data Layer
 
 - **Implemented:**
   - Postgres + Prisma schema with `Group`, `User`, `Game` models.
-  - Registration/login backed by the database with hashed passwords.
-  - Groups seeded to Israeli Premier League teams (with colors).
-  - Game results can be persisted via `saveGameResult`, and stats endpoints exist at controller level.
+  - Registration/login with hashed passwords; groups seeded with **asset-prefix** colors (red, whiteandred, etc.).
+  - Game results persisted via `recordGameResultForRoom` / `saveGameResult` when a match ends.
+  - **APIs:** `/api/rooms/active`, `/api/stats/players`, `/api/stats/groups` (with gamesPlayed, isRanked ≥8), `/api/stats/me`, `/api/stats/headtohead`.
+  - **UI:** WelcomeScreen tabs show active rooms (Lobby), leaderboards (Players/Groups with min 8 games), and personal stats + head‑to‑head (Personal).
 - **Still missing:**
-  - The **live game rooms** are still in‑memory only (Socket.IO `rooms` map) and are not recoverable after server restart.
-  - No exposed API/UI yet for viewing match history, leaderboards, or user stats.
-  - No ELO/ladder system.
+  - **Live rooms** are in‑memory only (Socket.IO `rooms` map); not recoverable after server restart.
+  - No match-history list or ELO/rating system.
 
 ---
 
@@ -150,30 +176,18 @@
 1. **iOS PWA Input Strategy**
    - Decide on a final approach for iOS PWA:
      - (Preferred) Build a small **custom virtual keyboard** for entering Room ID and credentials when running as iOS PWA.
-     - Or continue exploring focused iOS PWA workarounds, but avoid over‑complicating the main Welcome screen for non‑PWA users.
+     - Or continue exploring focused iOS PWA workarounds without over‑complicating the Welcome screen for non‑PWA users.
 
-2. **Battle & Tie UX Finalization**
-   - Run end‑to‑end tests on real devices (including PWA on Android & mobile browsers on iOS).
-   - Tweak pre‑battle delay, animations, tie messaging, and Matchup intro timing based on playtest feedback.
-   - Confirm that **all** tie‑breaker flows (tie, tie‑again, resolve, timeout) feel smooth and do not steal time from the 7s decision window.
+2. **Battle & Tie UX (real-device QA)**
+   - Run end‑to‑end tests on real devices (PWA on Android, mobile browsers on iOS).
+   - Tweak **pre‑battle delay**, animations, tie messaging, and Matchup intro timing from playtest feedback.
+   - Confirm all tie‑breaker flows (tie, tie‑again, resolve, timeout) feel smooth and do not steal time from the 7s window.
 
-3. **Persistence / History / Leaderboards**
-   - Wire the existing `Game` model and `saveGameResult` into the live game flow to persist every finished match.
-   - Add API endpoints and basic UI for:
-     - Player stats (wins/losses, streaks, preferred team).
-     - Match history and simple leaderboards.
-   - Consider an ELO/rating system once basic stats are stable.
+3. **Database / env setup (if not already done)**
+   - Ensure `DATABASE_URL` and `prisma migrate deploy` (or migrations) are run in the deployment environment so Postgres is used in production.
 
-4. **Regression & Smoke Tests**
-   - Create a small checklist or automated tests that cover:
-     - Room creation/join, setup phase, play, combat, tie, flag capture, no‑units win.
-     - Disconnect/reconnect within and beyond the 8s grace window.
-     - PWA install/uninstall on Android and iOS; verify basic flows after install.
-
-5. **Collaboration / Agent Behavior**
-   - When using the AI agent, **only apply code changes that were explicitly requested by the user**.
-   - Avoid bundling multiple unrelated changes into a single step unless the user has clearly asked for a broader refactor.
-   - Keep changes surgical and easy to reason about so debugging and rollbacks remain simple.
+4. **Regression & smoke tests**
+   - Checklist or light automation: room create/join, setup, play, combat, tie, flag capture, no‑units win; disconnect/reconnect within and beyond 8s grace; PWA install on Android/iOS and basic flows.
 
 ---
 

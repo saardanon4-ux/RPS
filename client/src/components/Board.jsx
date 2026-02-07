@@ -144,7 +144,7 @@ function getAdjacentKeys(row, col) {
 }
 
 export default function Board() {
-  const { gameState, playerId, player, players, gameOver, combatState, combatPending, tiePending, clearCombatAndApplyState, tieBreakerState, submitTieChoice, rematchRequested, requestRematch, makeMove, lastTieCombat } = useGame();
+  const { gameState, playerId, player, players, gameOver, combatState, combatPending, tiePending, clearCombatAndApplyState, tieBreakerState, submitTieChoice, rematchRequested, requestRematch, makeMove, lastTieCombat, authUser, authToken } = useGame();
   const isPlayer2 = player?.side === 'top';
   const [selected, setSelected] = useState(null); // { row, col }
 
@@ -235,6 +235,13 @@ export default function Board() {
             disconnectWin={!!gameOver.disconnectWin}
             opponentConnected={players.length === 2}
             onComplete={() => {}}
+            myId={authUser?.id ?? (typeof playerId === 'number' ? playerId : undefined)}
+            opponentId={opponent?.id}
+            myName={me?.name}
+            opponentName={opponent?.name}
+            myTeamColor={myTeamColor}
+            opponentTeamColor={opponentTeamColor}
+            authToken={authToken}
           />
         )}
         {Array.from({ length: GRID_SIZE }, (_, row) => (

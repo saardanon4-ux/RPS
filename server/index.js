@@ -10,7 +10,7 @@ import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import { register as registerUser, login as loginUser } from './controllers/authController.js';
 import { saveGameResult } from './controllers/gameController.js';
-import { getUserStats, getHeadToHeadSummaryForUser } from './controllers/statsController.js';
+import { getUserStats, getHeadToHeadSummaryForUser, getHeadToHead } from './controllers/statsController.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const prisma = new PrismaClient();
@@ -1444,6 +1444,30 @@ app.get('/api/stats/headtohead', async (req, res) => {
   } catch (err) {
     console.error('Error building head-to-head stats', err);
     res.status(500).json({ error: 'Failed to load head-to-head stats' });
+  }
+});
+
+app.get('/api/stats/rivalry', async (req, res) => {
+  try {
+    const userId = getUserIdFromRequest(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const myId = req.query.myId != null ? Number(req.query.myId) : null;
+    const opponentId = req.query.opponentId != null ? Number(req.query.opponentId) : null;
+    if (!myId || !opponentId || Number.isNaN(myId) || Number.isNaN(opponentId)) {
+      return res.status(400).json({ error: 'Missing or invalid myId and opponentId query params' });
+    }
+    if (Number(userId) !== myId) {
+      return res.status(403).json({ error: 'Can only request rivalry stats for yourself' });
+    }
+
+    const stats = await getHeadToHead(myId, opponentId);
+    res.json(stats);
+  } catch (err) {
+    console.error('Error building rivalry stats', err);
+    res.status(500).json({ error: 'Failed to load rivalry stats' });
   }
 });
 

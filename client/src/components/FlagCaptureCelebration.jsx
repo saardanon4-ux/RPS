@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
+import { getTeamColorStyle } from '../utils/colors';
 
 const VIDEO_DURATION_MS = 4000;
+const API_BASE = import.meta.env.VITE_SERVER_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 
 const WIN_LABELS = {
   flag: { title: 'דגל היריב נכבש!', sub: '🏆 ניצחון! 🏆', icon: '🚩' },
@@ -22,12 +24,86 @@ function wrapForPlayer2(content, isPlayer2) {
   );
 }
 
-export default function FlagCaptureCelebration({ won, winType = 'flag', onComplete, rematchRequested, requestRematch, playerId, isPlayer2, disconnectWin, opponentConnected }) {
+function RivalryScorecard({ myName, opponentName, myTeamColor, opponentTeamColor, wins, losses, draws }) {
+  const total = wins + losses + (draws ?? 0);
+  const iAmLeader = total > 0 && wins > losses;
+  const theyLead = total > 0 && losses > wins;
+  const myStyle = getTeamColorStyle(myTeamColor);
+  const oppStyle = getTeamColorStyle(opponentTeamColor);
+  return (
+    <div className="w-full mt-6 mb-2 p-4 rounded-xl bg-stone-800/90 border border-stone-600">
+      <p className="text-center text-stone-400 font-medium text-sm mb-3">המאזן ביניכם</p>
+      <div className="flex items-center justify-center gap-3 flex-wrap">
+        <div className={`flex items-center gap-2 min-w-0 ${iAmLeader ? 'text-emerald-400 font-semibold' : ''}`}>
+          <div
+            className="w-8 h-8 rounded-full flex-shrink-0 border-2 border-stone-500"
+            style={myStyle}
+            title={myName}
+          />
+          <span className="truncate max-w-[80px] sm:max-w-[100px]" title={myName}>{myName || 'אני'}</span>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0 font-mono text-lg">
+          <span className={iAmLeader ? 'text-emerald-400 font-bold' : ''}>{wins}</span>
+          <span className="text-stone-500">–</span>
+          <span className={theyLead ? 'text-amber-400 font-bold' : ''}>{losses}</span>
+          {(draws ?? 0) > 0 && (
+            <>
+              <span className="text-stone-500">({draws})</span>
+            </>
+          )}
+        </div>
+        <div className={`flex items-center gap-2 min-w-0 ${theyLead ? 'text-amber-400 font-semibold' : ''}`}>
+          <span className="truncate max-w-[80px] sm:max-w-[100px]" title={opponentName}>{opponentName || 'היריב'}</span>
+          <div
+            className="w-8 h-8 rounded-full flex-shrink-0 border-2 border-stone-500"
+            style={oppStyle}
+            title={opponentName}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function FlagCaptureCelebration({
+  won,
+  winType = 'flag',
+  onComplete,
+  rematchRequested,
+  requestRematch,
+  playerId,
+  isPlayer2,
+  disconnectWin,
+  opponentConnected,
+  myId,
+  opponentId,
+  myName,
+  opponentName,
+  myTeamColor,
+  opponentTeamColor,
+  authToken,
+}) {
   const iRequested = rematchRequested?.[playerId];
   const otherRequested = Object.keys(rematchRequested ?? {}).some((id) => id !== playerId && rematchRequested[id]);
   const bothReady = iRequested && otherRequested;
   const [showVideo, setShowVideo] = useState(won);
   const videoRef = useRef(null);
+  const [rivalry, setRivalry] = useState(null);
+
+  useEffect(() => {
+    if (!myId || !opponentId || !authToken) return;
+    let cancelled = false;
+    const qs = new URLSearchParams({ myId: String(myId), opponentId: String(opponentId) });
+    fetch(`${API_BASE}/api/stats/rivalry?${qs}`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setRivalry(data);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [myId, opponentId, authToken]);
 
   useEffect(() => {
     if (won) {
@@ -152,6 +228,17 @@ export default function FlagCaptureCelebration({ won, winType = 'flag', onComple
           >
             🎉🎊🥳🎉🎊
           </motion.div>
+          {rivalry != null && (
+            <RivalryScorecard
+              myName={myName}
+              opponentName={opponentName}
+              myTeamColor={myTeamColor}
+              opponentTeamColor={opponentTeamColor}
+              wins={rivalry.wins}
+              losses={rivalry.losses}
+              draws={rivalry.draws}
+            />
+          )}
           {!disconnectWin && opponentConnected && (
             <button
               type="button"
@@ -189,6 +276,17 @@ export default function FlagCaptureCelebration({ won, winType = 'flag', onComple
         </motion.p>
         <p className="text-xl font-bold text-stone-400">{LOSE_LABELS[winType]?.title ?? LOSE_LABELS.flag.title}</p>
         <p className="text-2xl font-black text-red-500 mt-2">{LOSE_LABELS[winType]?.sub ?? LOSE_LABELS.flag.sub}</p>
+        {rivalry != null && (
+          <RivalryScorecard
+            myName={myName}
+            opponentName={opponentName}
+            myTeamColor={myTeamColor}
+            opponentTeamColor={opponentTeamColor}
+            wins={rivalry.wins}
+            losses={rivalry.losses}
+            draws={rivalry.draws}
+          />
+        )}
         {!disconnectWin && opponentConnected && (
           <button
             type="button"

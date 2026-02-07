@@ -1,9 +1,12 @@
 import { motion, AnimatePresence } from 'framer-motion';
+import { getTeamColorStyle, getTeamPrimaryHex } from '../utils/colors';
 
 function PlayerCard({ player, align = 'left' }) {
   const name = player?.name ?? 'שחקן';
   const teamName = player?.teamName ?? 'קבוצה לא ידועה';
-  const teamColor = player?.teamColor ?? '#64748b';
+  const teamColor = player?.teamColor ?? null;
+  const primaryHex = getTeamPrimaryHex(teamColor) || '#64748b';
+  const teamStyle = getTeamColorStyle(teamColor);
 
   const isLeft = align === 'left';
 
@@ -19,8 +22,13 @@ function PlayerCard({ player, align = 'left' }) {
         className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 shadow-2xl flex items-center justify-center overflow-hidden"
         style={{
           borderColor: '#ffffff',
-          boxShadow: `0 0 40px ${teamColor}cc`,
-          background: `radial-gradient(circle at 30% 20%, ${teamColor}aa, transparent 60%), radial-gradient(circle at 70% 80%, ${teamColor}77, transparent 60%)`,
+          boxShadow: `0 0 40px ${primaryHex}cc`,
+          ...teamStyle,
+          ...(teamStyle.background
+            ? {}
+            : {
+                background: `radial-gradient(circle at 30% 20%, ${primaryHex}aa, transparent 60%), radial-gradient(circle at 70% 80%, ${primaryHex}77, transparent 60%)`,
+              }),
         }}
       >
         <div className="absolute inset-0 bg-black/30" />
@@ -35,7 +43,7 @@ function PlayerCard({ player, align = 'left' }) {
         <span className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-white/80">
           <span
             className="inline-block w-3 h-3 rounded-full border border-white/70 shadow-md"
-            style={{ backgroundColor: teamColor }}
+            style={teamStyle}
           />
           <span className="uppercase tracking-widest">{teamName}</span>
         </span>

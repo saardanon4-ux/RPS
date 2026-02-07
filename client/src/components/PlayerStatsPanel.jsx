@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useGame } from '../context/GameContext';
+import { getTeamColorStyle } from '../utils/colors';
 
 const apiBase = import.meta.env.VITE_SERVER_URL || '';
 
@@ -91,7 +92,7 @@ export default function PlayerStatsPanel() {
           <div className="flex items-center gap-2 text-xs text-white/80">
             <span
               className="inline-block w-3 h-3 rounded-full border border-white/60"
-              style={{ backgroundColor: user.group.color || '#64748b' }}
+              style={getTeamColorStyle(user.group.color)}
             />
             <span>{user.group.name}</span>
           </div>

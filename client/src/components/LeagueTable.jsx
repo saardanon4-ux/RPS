@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getTeamColorStyle } from '../utils/colors';
 
 const apiBase = import.meta.env.VITE_SERVER_URL || '';
 
@@ -69,7 +70,7 @@ export default function LeagueTable() {
                     <div className="flex items-center justify-start gap-2">
                       <span
                         className="inline-block w-2.5 h-2.5 rounded-full border border-white/60"
-                        style={{ backgroundColor: g.color || '#64748b' }}
+                        style={getTeamColorStyle(g.color)}
                       />
                       <span className="font-semibold truncate">{g.name}</span>
                     </div>

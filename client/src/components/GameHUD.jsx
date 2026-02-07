@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { getTeamColorStyle, getTeamPrimaryHex } from '../utils/colors';
 
 function normalizeHex(color) {
   if (!color) return '';
@@ -15,8 +16,10 @@ function PlayerSlot({ player, isCurrentTurn, isLocal, emoji, forceColorSwap }) {
   const winRate = Math.round((wins / total) * 100);
   const initial = name ? name.charAt(0).toUpperCase() : '?';
 
-  const avatarBg = forceColorSwap ? '#ca8a04' : (teamColor || 'rgba(15,23,42,0.8)');
-  const dotColor = forceColorSwap ? '#eab308' : (teamColor || '#64748b');
+  const avatarStyle = forceColorSwap
+    ? { background: '#ca8a04' }
+    : (teamColor ? getTeamColorStyle(teamColor) : { background: 'rgba(15,23,42,0.8)' });
+  const dotColor = forceColorSwap ? '#eab308' : (getTeamPrimaryHex(teamColor) || '#64748b');
 
   return (
     <motion.div
@@ -29,7 +32,7 @@ function PlayerSlot({ player, isCurrentTurn, isLocal, emoji, forceColorSwap }) {
       <div
         className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold shrink-0 border ${forceColorSwap ? 'border-amber-400/50 text-amber-950' : 'border-white/20 text-white/95'}`}
         style={{
-          background: avatarBg,
+          ...avatarStyle,
           boxShadow: isCurrentTurn ? '0 0 12px rgba(52,211,153,0.5)' : undefined,
         }}
       >
@@ -73,7 +76,8 @@ export default function GameHUD({ players, currentTurn, turnRemaining, gameOver,
   const opponent = players.find((p) => p.id !== localPlayerId);
   const myTeamColor = localPlayer?.teamColor || '';
   const opponentTeamColor = opponent?.teamColor || '';
-  const isClash = normalizeHex(myTeamColor) === normalizeHex(opponentTeamColor);
+  const isClash =
+    (myTeamColor && opponentTeamColor && String(myTeamColor).toLowerCase() === String(opponentTeamColor).toLowerCase());
 
   const p1Emoji = player1 ? emojiReactions?.[player1.id]?.emoji : null;
   const p2Emoji = player2 ? emojiReactions?.[player2.id]?.emoji : null;

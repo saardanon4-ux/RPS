@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getTeamColorStyle } from '../utils/colors';
 
 const apiBase = import.meta.env.VITE_SERVER_URL || '';
 
@@ -85,7 +86,7 @@ export default function Leaderboard() {
                   <span className="inline-flex items-center gap-1 text-[10px] text-white/70">
                     <span
                       className="inline-block w-2 h-2 rounded-full border border-white/60"
-                      style={{ backgroundColor: p.group.color }}
+                      style={getTeamColorStyle(p.group.color)}
                     />
                     <span>{p.group.name}</span>
                   </span>
@@ -114,7 +115,7 @@ export default function Leaderboard() {
                 <span className="text-white/90 font-semibold">{g.name}</span>
                 <span
                   className="inline-block w-3 h-3 rounded-full border border-white/60"
-                  style={{ backgroundColor: g.color }}
+                  style={getTeamColorStyle(g.color)}
                 />
               </div>
               <div className="text-[11px] text-white/80">

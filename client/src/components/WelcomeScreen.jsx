@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../context/GameContext';
+import { getTeamColorStyle } from '../utils/colors';
 import HowToPlayModal from './HowToPlayModal';
 import PlayerStatsPanel from './PlayerStatsPanel';
 
@@ -276,7 +277,7 @@ export default function WelcomeScreen() {
                 {authUser.group?.color && (
                   <span
                     className="inline-block w-3 h-3 rounded-full border border-white/60 shadow-sm"
-                    style={{ backgroundColor: authUser.group.color }}
+                    style={getTeamColorStyle(authUser.group.color)}
                   />
                 )}
                 <div className="flex flex-col">
@@ -402,7 +403,7 @@ export default function WelcomeScreen() {
                           <>
                             <span
                               className="inline-block w-3.5 h-3.5 rounded-full border border-white/60 shadow-sm"
-                              style={{ backgroundColor: selectedGroup.color }}
+                              style={getTeamColorStyle(selectedGroup.color)}
                             />
                             <span>{selectedGroup.name}</span>
                           </>
@@ -432,7 +433,7 @@ export default function WelcomeScreen() {
                             <span className="flex items-center gap-2">
                               <span
                                 className="inline-block w-3 h-3 rounded-full border border-white/60 shadow-sm"
-                                style={{ backgroundColor: group.color }}
+                                style={getTeamColorStyle(group.color)}
                               />
                               <span>{group.name}</span>
                             </span>
@@ -600,7 +601,7 @@ export default function WelcomeScreen() {
                             <div className="flex items-center gap-2 min-w-0">
                               <span
                                 className="shrink-0 w-3 h-3 rounded-full border border-white/50"
-                                style={{ backgroundColor: room.teamColor || '#64748b' }}
+                                style={getTeamColorStyle(room.teamColor)}
                               />
                               <span className="text-sm font-medium text-white/90 truncate">
                                 {room.teamName || 'ללא שם'}
@@ -699,9 +700,7 @@ export default function WelcomeScreen() {
                                       {(row.groupColor || row.color) && (
                                         <span
                                           className="inline-block w-2.5 h-2.5 rounded-full border border-white/60"
-                                          style={{
-                                            backgroundColor: row.groupColor || row.color || '#64748b',
-                                          }}
+                                          style={getTeamColorStyle(row.groupColor || row.color)}
                                         />
                                       )}
                                       <span className="font-semibold truncate">
