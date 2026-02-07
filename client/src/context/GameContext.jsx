@@ -32,11 +32,26 @@ export function GameProvider({ children }) {
   const [authUser, setAuthUser] = useState(null);
   const [authToken, setAuthToken] = useState(null);
   const [roomListVersion, setRoomListVersion] = useState(0);
+  const [showCinematic, setShowCinematic] = useState(false);
+  const [cinematicWinnerColor, setCinematicWinnerColor] = useState(null);
   const stateRef = useRef({ roomId: '', player: null });
   stateRef.current = { roomId, player };
+  const playersRef = useRef([]);
+  const pendingGameOverRef = useRef(null);
+  useEffect(() => {
+    playersRef.current = players;
+  }, [players]);
   // CRITICAL UI lock: prevents re-triggering animations due to duplicate/overlapping events.
   const isAnimatingRef = useRef(false);
   const preBattleTimeoutRef = useRef(null);
+
+  const handleCinematicComplete = () => {
+    setShowCinematic(false);
+    setCinematicWinnerColor(null);
+    const payload = pendingGameOverRef.current;
+    pendingGameOverRef.current = null;
+    if (payload) setGameOver(payload);
+  };
 
   useEffect(() => {
     // Hydrate auth state from localStorage on first load
@@ -241,7 +256,12 @@ export function GameProvider({ children }) {
 
 
     const onGameOver = ({ winnerId, flagCapture, disconnectWin }) => {
-      setGameOver({ winnerId, flagCapture: !!flagCapture, disconnectWin: !!disconnectWin });
+      const currentPlayers = playersRef.current;
+      const winner = currentPlayers.find((p) => p.id === winnerId);
+      const winnerColor = winner?.teamColor || 'red';
+      pendingGameOverRef.current = { winnerId, flagCapture: !!flagCapture, disconnectWin: !!disconnectWin };
+      setCinematicWinnerColor(winnerColor);
+      setShowCinematic(true);
       setTieBreakerState(null);
       setRematchRequested({});
     };
@@ -353,6 +373,9 @@ export function GameProvider({ children }) {
     setPlayers([]);
     setGameState(null);
     setGameOver(null);
+    setShowCinematic(false);
+    setCinematicWinnerColor(null);
+    pendingGameOverRef.current = null;
     setCombatState(null);
     setCombatPending(null);
     setTiePending(null);
@@ -476,6 +499,9 @@ export function GameProvider({ children }) {
         joinRoom,
         leaveRoom,
         roomListVersion,
+        showCinematic,
+        cinematicWinnerColor,
+        handleCinematicComplete,
       }}
     >
       {children}

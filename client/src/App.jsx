@@ -6,6 +6,7 @@ import SetupBoard from './components/SetupBoard';
 import HowToPlayModal from './components/HowToPlayModal';
 import MatchupScreen from './components/MatchupScreen';
 import AssetPreloader from './components/AssetPreloader';
+import VictoryCinematic from './components/game/VictoryCinematic';
 import { useGame } from './context/GameContext';
 
 const EMOJI_OPTIONS = ['🤫', '✂️', '🧠', '💣', '😂', '😈'];
@@ -40,6 +41,9 @@ export default function App() {
     leaveRoom,
     emojiReactions,
     sendEmoji,
+    showCinematic,
+    cinematicWinnerColor,
+    handleCinematicComplete,
   } = useGame();
 
   const totalSec = 40;
@@ -88,6 +92,12 @@ export default function App() {
 
   return (
     <div className="h-[100dvh] bg-gradient-to-b from-slate-900 via-indigo-950/50 to-slate-900 text-white flex flex-col overflow-hidden">
+      {showCinematic && (
+        <VictoryCinematic
+          winnerColor={cinematicWinnerColor}
+          onComplete={handleCinematicComplete}
+        />
+      )}
       {opponentLeft && (
         <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center gap-4 px-4 py-3 bg-amber-900/90 border-b border-amber-600/50 backdrop-blur-sm">
           <span className="text-amber-200 font-medium">השחקן השני עזב את החדר.</span>
