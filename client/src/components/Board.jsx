@@ -226,6 +226,7 @@ export default function Board() {
         )}
         {gameOver && (
           <FlagCaptureCelebration
+            gameOverPayload={gameOver}
             won={gameOver.winnerId === playerId}
             winType={gameOver.flagCapture ? 'flag' : 'no_units'}
             rematchRequested={rematchRequested}
