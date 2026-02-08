@@ -34,6 +34,7 @@ export function GameProvider({ children }) {
   const [roomListVersion, setRoomListVersion] = useState(0);
   const [showCinematic, setShowCinematic] = useState(false);
   const [cinematicWinnerColor, setCinematicWinnerColor] = useState(null);
+  const [opponentDisconnected, setOpponentDisconnected] = useState(false);
   const stateRef = useRef({ roomId: '', player: null });
   stateRef.current = { roomId, player };
   const playersRef = useRef([]);
@@ -44,6 +45,7 @@ export function GameProvider({ children }) {
   // CRITICAL UI lock: prevents re-triggering animations due to duplicate/overlapping events.
   const isAnimatingRef = useRef(false);
   const preBattleTimeoutRef = useRef(null);
+  const setupTimerAutoSubmitRef = useRef(false);
 
   const handleCinematicComplete = () => {
     setShowCinematic(false);
@@ -75,7 +77,7 @@ export function GameProvider({ children }) {
     if (!authToken) return;
 
     const s = io(SOCKET_URL, {
-      auth: { token: authToken },
+      auth: { token: authToken, userId: authUser?.id },
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 10,
@@ -88,7 +90,6 @@ export function GameProvider({ children }) {
     });
 
     let reconnectRoomId = null;
-    let reconnectPlayerName = null;
 
     const onConnect = () => {
       setConnected(true);
@@ -96,23 +97,13 @@ export function GameProvider({ children }) {
       if (reconnectRoomId) {
         const rid = reconnectRoomId;
         reconnectRoomId = null;
-        const persistentId =
-          (typeof localStorage !== 'undefined' && localStorage.getItem('rps_player_id')) ||
-          crypto.randomUUID();
-        if (typeof localStorage !== 'undefined') localStorage.setItem('rps_player_id', persistentId);
-        s.emit('join_room', {
-          roomId: rid,
-          playerName: reconnectPlayerName || undefined,
-          persistentPlayerId: persistentId,
-        });
-        reconnectPlayerName = null;
+        s.emit('join_room', { roomId: rid });
       }
     };
 
     const onDisconnect = () => {
       setConnected(false);
       reconnectRoomId = stateRef.current.roomId;
-      reconnectPlayerName = stateRef.current.player?.name;
     };
 
     const onJoinedRoom = ({ roomId: rid, playerId: pid, player: p, players: pl }) => {
@@ -122,6 +113,7 @@ export function GameProvider({ children }) {
       setPlayers(pl);
       setGameState(null); // cleared until game_start
       setError(null);
+      setOpponentDisconnected(false);
     };
 
     const onRoomFull = () => {
@@ -169,6 +161,15 @@ export function GameProvider({ children }) {
       if (preBattleTimeoutRef.current) clearTimeout(preBattleTimeoutRef.current);
       preBattleTimeoutRef.current = null;
     };
+
+    const onGameRestored = ({ gameState: gs, phase: p }) => {
+      if (p === 'PLAYING' && gs) {
+        onGameStart({ gameState: gs });
+      }
+    };
+
+    const onPlayerDisconnected = () => setOpponentDisconnected(true);
+    const onPlayerReconnected = () => setOpponentDisconnected(false);
 
     const onGameStateUpdate = ({ gameState: gs }) => {
       setGameState(gs);
@@ -298,7 +299,10 @@ export function GameProvider({ children }) {
     s.on('setup_update', onSetupUpdate);
     s.on('setup_timer', onSetupTimer);
     s.on('game_start', onGameStart);
+    s.on('game_restored', onGameRestored);
     s.on('game_state_update', onGameStateUpdate);
+    s.on('player_disconnected', onPlayerDisconnected);
+    s.on('player_reconnected', onPlayerReconnected);
     s.on('combat_event', onCombatEvent);
     s.on('tie_break_start', onTieBreakStart);
     s.on('tie_break_tie', onTieBreakTie);
@@ -323,7 +327,10 @@ export function GameProvider({ children }) {
       s.off('setup_update', onSetupUpdate);
       s.off('setup_timer', onSetupTimer);
       s.off('game_start', onGameStart);
+      s.off('game_restored', onGameRestored);
       s.off('game_state_update', onGameStateUpdate);
+      s.off('player_disconnected', onPlayerDisconnected);
+      s.off('player_reconnected', onPlayerReconnected);
       s.off('combat_event', onCombatEvent);
       s.off('tie_break_start', onTieBreakStart);
       s.off('tie_break_tie', onTieBreakTie);
@@ -334,7 +341,7 @@ export function GameProvider({ children }) {
       s.off('emoji_reaction', onEmojiReaction);
       s.disconnect();
     };
-  }, [authToken]);
+  }, [authToken, authUser?.id]);
 
   useEffect(() => {
     if (!socket || players.length !== 2) return;
@@ -345,6 +352,23 @@ export function GameProvider({ children }) {
     const interval = setInterval(poll, 1000);
     return () => clearInterval(interval);
   }, [socket, players.length, gameState, setupPhase]);
+
+  // When setup timer hits 0 and local player is not ready: auto randomize + submit (safety net)
+  useEffect(() => {
+    if (!setupPhase) {
+      setupTimerAutoSubmitRef.current = false;
+      return;
+    }
+    if (setupTimer !== 0 || !socket || !playerId) return;
+    if (setupReady?.[playerId]) return;
+    if (setupTimerAutoSubmitRef.current) return;
+    setupTimerAutoSubmitRef.current = true;
+    socket.emit('randomize_setup');
+    const t = setTimeout(() => {
+      socket.emit('setup_ready');
+    }, 250);
+    return () => clearTimeout(t);
+  }, [setupPhase, setupTimer, setupReady, playerId, socket]);
 
   useEffect(() => {
     if (!socket || !gameOver) return;
@@ -388,6 +412,7 @@ export function GameProvider({ children }) {
     setSetupReady({});
     setSetupTimer(null);
     setRematchRequested({});
+    setOpponentDisconnected(false);
   };
 
   const placeUnit = (row, col, type) => {
@@ -502,6 +527,7 @@ export function GameProvider({ children }) {
         showCinematic,
         cinematicWinnerColor,
         handleCinematicComplete,
+        opponentDisconnected,
       }}
     >
       {children}

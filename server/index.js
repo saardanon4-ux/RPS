@@ -47,7 +47,7 @@ const IMMOBILE_TYPES = ['flag', 'trap'];
 const SETUP_DURATION_SEC = 40;
 const TIE_BREAKER_DURATION_MS = 7000;
 const TURN_TIMEOUT_SEC = 30;
-const DISCONNECT_GRACE_MS = 8000;
+const DISCONNECT_GRACE_MS = 30000;
 
 function makeBattleId(prefix = 'battle') {
   return `${prefix}-${Date.now()}-${crypto.randomUUID()}`;
@@ -318,6 +318,7 @@ function startSetupPhase(room) {
     io.to(room.roomId).emit('setup_timer', { remaining });
     if (remaining <= 0) {
       clearInterval(room.setupInterval);
+      room.setupInterval = null;
       room.players.forEach((p) => {
         if (!room.setupReady[p.id]) {
           smartFillEmptySlots(room, p.id);
@@ -702,11 +703,21 @@ io.on('connection', (socket) => {
         socket.emit('room_full', { roomId: rid });
         return;
       }
+      if (room.disconnectTimers?.[pid]) {
+        clearTimeout(room.disconnectTimers[pid]);
+        delete room.disconnectTimers[pid];
+      }
       existingPlayer.socketId = socket.id;
       const player = existingPlayer;
       socket.join(rid);
       socket.roomId = rid;
       socket.playerId = pid;
+
+      room.players.forEach((q) => {
+        if (q.socketId && q.id !== pid) {
+          io.to(q.socketId).emit('player_reconnected', { roomId: rid, reconnectedPlayerId: pid });
+        }
+      });
 
       socket.emit('joined_room', {
         roomId: rid,
@@ -766,7 +777,10 @@ io.on('connection', (socket) => {
         socket.emit('setup_timer', { remaining });
       } else if (room.phase === 'PLAYING' && room.gameState) {
         const sanitized = sanitizeGameStateForPlayer(room.gameState, pid);
-        socket.emit('game_start', { gameState: { ...sanitized, turnStartTime: room.turnStartTime }, phase: 'PLAYING' });
+        socket.emit('game_restored', {
+          gameState: { ...sanitized, turnStartTime: room.turnStartTime },
+          phase: 'PLAYING',
+        });
       } else if (room.phase === 'TIE_BREAKER' && room.tieBreaker) {
         const sanitized = sanitizeGameStateForPlayer(room.gameState, pid);
         socket.emit('game_state_update', { gameState: sanitized });
@@ -1053,12 +1067,16 @@ io.on('connection', (socket) => {
     if (!room.rematchRequested) room.rematchRequested = {};
     room.rematchRequested[socket.playerId] = true;
     const connectedPlayers = room.players.filter((p) => p.socketId);
-    const bothRequested = connectedPlayers.every((p) => room.rematchRequested[p.id]);
+    // Emit rematch_update first so UI shows "Opponent wants rematch" etc.
     room.players.forEach((p) => {
       if (!p.socketId) return;
       io.to(p.socketId).emit('rematch_update', { rematchRequested: { ...room.rematchRequested } });
     });
-    if (bothRequested && connectedPlayers.length === 2) {
+    // Only restart when BOTH connected players have requested rematch
+    const bothRequested =
+      connectedPlayers.length === 2 &&
+      connectedPlayers.every((p) => room.rematchRequested[p.id] === true);
+    if (bothRequested) {
       startSetupPhase(room);
     }
   });
@@ -1139,6 +1157,11 @@ io.on('connection', (socket) => {
         const player = room.players.find((p) => p.id === leftPlayerId);
         if (player) {
           player.socketId = null;
+          room.players.forEach((q) => {
+            if (q.socketId && q.id !== leftPlayerId) {
+              io.to(q.socketId).emit('player_disconnected', { roomId: leftRoomId, disconnectedPlayerId: leftPlayerId });
+            }
+          });
           if (!room.disconnectTimers) room.disconnectTimers = {};
           if (room.disconnectTimers[player.id]) {
             clearTimeout(room.disconnectTimers[player.id]);

@@ -44,6 +44,8 @@ export default function App() {
     showCinematic,
     cinematicWinnerColor,
     handleCinematicComplete,
+    connected,
+    opponentDisconnected,
   } = useGame();
 
   const totalSec = 40;
@@ -97,6 +99,16 @@ export default function App() {
           winnerColor={cinematicWinnerColor}
           onComplete={handleCinematicComplete}
         />
+      )}
+      {inRoom && !connected && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-amber-500/95 text-amber-950 font-semibold text-sm shadow-lg animate-pulse">
+          מתחבר מחדש...
+        </div>
+      )}
+      {opponentDisconnected && !opponentLeft && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-40 px-4 py-2 rounded-full bg-slate-600/95 text-white text-sm shadow-lg">
+          היריב מתחבר מחדש...
+        </div>
       )}
       {opponentLeft && (
         <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center gap-4 px-4 py-3 bg-amber-900/90 border-b border-amber-600/50 backdrop-blur-sm">
