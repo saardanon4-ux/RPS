@@ -65,20 +65,32 @@ export async function getUserStats(userId) {
   };
 }
 
-export async function getHeadToHead(player1Id, player2Id) {
-  const a = Number(player1Id);
-  const b = Number(player2Id);
-  if (!a || !b || Number.isNaN(a) || Number.isNaN(b)) {
+/**
+ * Rivalry stats between current user and opponent.
+ * Finds ALL games where these two users played (either as playerA or playerB).
+ * Schema has no status field - every Game row is a finished game.
+ * @param {number} currentUserId - The user requesting (stats are from their perspective).
+ * @param {number} opponentId - The other player.
+ * @returns {{ wins, losses, draws, totalGames }}
+ */
+export async function getHeadToHead(currentUserId, opponentId) {
+  const current = Number(currentUserId);
+  const opponent = Number(opponentId);
+  if (!current || !opponent || Number.isNaN(current) || Number.isNaN(opponent)) {
     throw new Error('Invalid player ids');
+  }
+  if (current === opponent) {
+    return { wins: 0, losses: 0, draws: 0, totalGames: 0 };
   }
 
   const games = await prisma.game.findMany({
     where: {
       OR: [
-        { playerAId: a, playerBId: b },
-        { playerAId: b, playerBId: a },
+        { playerAId: current, playerBId: opponent },
+        { playerAId: opponent, playerBId: current },
       ],
     },
+    select: { winnerId: true },
     orderBy: { createdAt: 'asc' },
   });
 
@@ -86,21 +98,21 @@ export async function getHeadToHead(player1Id, player2Id) {
   let losses = 0;
   let draws = 0;
 
-  for (const g of games) {
-    if (!g.winnerId) {
-      draws += 1;
-    } else if (g.winnerId === a) {
+  for (const game of games) {
+    if (game.winnerId === current) {
       wins += 1;
-    } else if (g.winnerId === b) {
+    } else if (game.winnerId === opponent) {
       losses += 1;
+    } else {
+      draws += 1;
     }
   }
 
   return {
-    gamesPlayed: games.length,
     wins,
     losses,
     draws,
+    totalGames: games.length,
   };
 }
 

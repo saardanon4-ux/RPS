@@ -303,6 +303,7 @@ function startSetupPhase(room) {
   room.rematchRequested = null;
   room.lastWinnerId = null;
   room.lastFlagCapture = null;
+  room.resultPersisted = false;
 
   room.players.forEach((p) => {
     room.setupReady[p.id] = false;
