@@ -1,13 +1,25 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { getTeamPrimaryHex } from '../../utils/colors';
 
 const VictoryCinematic = ({ winnerColor, onComplete }) => {
   const videoRef = useRef(null);
+  const [showTapToPlay, setShowTapToPlay] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const videoSrc = `/assets/units/${winnerColor || 'red'}.celebration.mp4`;
   const primaryHex = getTeamPrimaryHex(winnerColor) || '#ef4444';
   const borderGlow = {
     boxShadow: `0 0 0 2px ${primaryHex}99, 0 0 32px ${primaryHex}66, 0 0 64px ${primaryHex}44`,
+  };
+
+  const tryPlay = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = true;
+    video.play().then(() => {
+      setIsPlaying(true);
+      setShowTapToPlay(false);
+    }).catch(() => {});
   };
 
   useEffect(() => {
@@ -18,10 +30,37 @@ const VictoryCinematic = ({ winnerColor, onComplete }) => {
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    const play = () => video.play().catch(() => {});
-    if (video.readyState >= 2) play();
-    else video.addEventListener('loadeddata', play);
-    return () => video.removeEventListener('loadeddata', play);
+
+    tryPlay();
+    const onCanPlay = () => tryPlay();
+    const onPlaying = () => {
+      setIsPlaying(true);
+      setShowTapToPlay(false);
+    };
+
+    video.addEventListener('loadeddata', tryPlay);
+    video.addEventListener('canplay', onCanPlay);
+    video.addEventListener('canplaythrough', onCanPlay);
+    video.addEventListener('playing', onPlaying);
+
+    const retry = setInterval(tryPlay, 300);
+    const stopRetry = setTimeout(() => clearInterval(retry), 2000);
+
+    const showTapFallback = setTimeout(() => {
+      if (!videoRef.current) return;
+      if (videoRef.current.readyState >= 2 && !videoRef.current.paused) return;
+      setShowTapToPlay(true);
+    }, 1200);
+
+    return () => {
+      video.removeEventListener('loadeddata', tryPlay);
+      video.removeEventListener('canplay', onCanPlay);
+      video.removeEventListener('canplaythrough', onCanPlay);
+      video.removeEventListener('playing', onPlaying);
+      clearInterval(retry);
+      clearTimeout(stopRetry);
+      clearTimeout(showTapFallback);
+    };
   }, [videoSrc]);
 
   return (
@@ -37,9 +76,19 @@ const VictoryCinematic = ({ winnerColor, onComplete }) => {
           autoPlay
           playsInline
           muted
+          preload="auto"
           onEnded={onComplete}
           onError={() => onComplete()}
         />
+        {showTapToPlay && !isPlaying && (
+          <button
+            type="button"
+            className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-[2px] text-white/95 text-sm sm:text-base font-medium focus:outline-none focus:ring-2 focus:ring-white/50 rounded-2xl"
+            onClick={tryPlay}
+          >
+            <span className="px-4 py-2 rounded-xl bg-black/40">לצפייה בסרטון חגיגה</span>
+          </button>
+        )}
         <button
           type="button"
           onClick={onComplete}
