@@ -206,6 +206,10 @@ export function GameProvider({ children }) {
     };
 
     const onTieBreakTie = ({ battleId, combatResult, attackerId, fromRow, fromCol, toRow, toCol, newGameState }) => {
+      if (isAnimatingRef.current) return;
+      isAnimatingRef.current = true;
+      if (preBattleTimeoutRef.current) clearTimeout(preBattleTimeoutRef.current);
+      preBattleTimeoutRef.current = null;
       const payload = {
         battleId,
         attackerType: combatResult.attackerType,
@@ -214,7 +218,6 @@ export function GameProvider({ children }) {
         attackerId,
         fromRow, fromCol, toRow, toCol,
       };
-      // Apply game state immediately and just remember the last tie combat for Sudden Death UI.
       if (newGameState) {
         setGameState(newGameState);
         setPendingGameState(null);
@@ -222,8 +225,13 @@ export function GameProvider({ children }) {
         setPendingGameState(null);
       }
       setLastTieCombat(payload);
-      // IMPORTANT: do NOT trigger CombatModal here – we want to go straight back to selection.
-      isAnimatingRef.current = false;
+      setCombatPending(payload);
+      preBattleTimeoutRef.current = setTimeout(() => {
+        setCombatState(payload);
+        setCombatPending(null);
+        preBattleTimeoutRef.current = null;
+        isAnimatingRef.current = false;
+      }, PRE_BATTLE_DELAY_MS);
     };
 
     const onTieBreakRestart = ({ battleId, deadline, timeout, fromRow, fromCol, toRow, toCol }) => {

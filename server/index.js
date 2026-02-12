@@ -149,16 +149,25 @@ function resolveTieBreaker(room) {
 
   const choice1 = tb.choices[attackerId];
   const choice2 = tb.choices[defenderOwnerId];
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/322691c2-8233-44c2-b3fb-a0bb278aacee',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.js:resolveTieBreaker',message:'choices',data:{choice1,choice2,sameChoice:choice1===choice2,lastEmittedBattleId:tb.lastEmittedBattleId},timestamp:Date.now(),hypothesisId:'tie-H2'})}).catch(()=>{});
+  // #endregion
 
   if (choice1 === choice2) {
     // Same choice - show combat (tie) then restart
     const battleId = `${tb.encounterId}:draw:${tb.round ?? 0}`;
     if (tb.lastEmittedBattleId === battleId) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/322691c2-8233-44c2-b3fb-a0bb278aacee',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.js:resolveTieBreaker',message:'same choice early return lastEmitted',data:{battleId},timestamp:Date.now(),hypothesisId:'tie-H2'})}).catch(()=>{});
+      // #endregion
       tb.isResolving = false;
       return;
     }
     tb.lastEmittedBattleId = battleId;
     const tieCombatResult = { attackerType: choice1, defenderType: choice2, result: 'both_destroyed' };
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/322691c2-8233-44c2-b3fb-a0bb278aacee',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.js:resolveTieBreaker',message:'emitting tie_break_tie',data:{battleId},timestamp:Date.now(),hypothesisId:'tie-H3'})}).catch(()=>{});
+    // #endregion
     room.players.forEach((p) => {
       if (!p.socketId) return;
       const entry = sanitizeGameStateForPlayer(room.gameState, p.id);
@@ -304,6 +313,9 @@ function startSetupPhase(room) {
   room.lastWinnerId = null;
   room.lastFlagCapture = null;
   room.resultPersisted = false;
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/322691c2-8233-44c2-b3fb-a0bb278aacee',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.js:startSetupPhase',message:'resultPersisted=false',data:{roomId:room.roomId},timestamp:Date.now(),hypothesisId:'rematch-H4'})}).catch(()=>{});
+  // #endregion
 
   room.players.forEach((p) => {
     room.setupReady[p.id] = false;
@@ -589,7 +601,15 @@ setInterval(() => {
 
 async function recordGameResultForRoom(room, winnerId = null, explicitPlayerIds = null) {
   try {
-    if (!room || room.resultPersisted) return;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/322691c2-8233-44c2-b3fb-a0bb278aacee',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.js:recordGameResultForRoom',message:'entry',data:{roomId:room?.roomId,resultPersisted:room?.resultPersisted,winnerId,hasExplicit:!!explicitPlayerIds},timestamp:Date.now(),hypothesisId:'rematch-H1'})}).catch(()=>{});
+    // #endregion
+    if (!room || room.resultPersisted) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/322691c2-8233-44c2-b3fb-a0bb278aacee',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.js:recordGameResultForRoom',message:'early return resultPersisted',data:{roomId:room?.roomId},timestamp:Date.now(),hypothesisId:'rematch-H1'})}).catch(()=>{});
+      // #endregion
+      return;
+    }
 
     let playerIds = explicitPlayerIds;
     if (!playerIds) {
@@ -601,8 +621,14 @@ async function recordGameResultForRoom(room, winnerId = null, explicitPlayerIds 
     const [playerAId, playerBId] = playerIds;
 
     room.resultPersisted = true;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/322691c2-8233-44c2-b3fb-a0bb278aacee',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.js:recordGameResultForRoom',message:'calling saveGameResult',data:{playerAId,playerBId,winnerId},timestamp:Date.now(),hypothesisId:'rematch-H2'})}).catch(()=>{});
+    // #endregion
     await saveGameResult(playerAId, playerBId, winnerId);
   } catch (err) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/322691c2-8233-44c2-b3fb-a0bb278aacee',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.js:recordGameResultForRoom',message:'saveGameResult error',data:{err: String(err.message)},timestamp:Date.now(),hypothesisId:'rematch-H3'})}).catch(()=>{});
+    // #endregion
     // Do not crash the game flow if persistence fails
     console.error('Failed to record game result:', err);
   }
@@ -1094,6 +1120,11 @@ io.on('connection', (socket) => {
     tb.choices[socket.playerId] = choice;
     const bothSubmitted =
       tb.choices[tb.attackerId] != null && tb.choices[tb.defenderOwnerId] != null;
+    // #region agent log
+    const c1 = tb.choices[tb.attackerId];
+    const c2 = tb.choices[tb.defenderOwnerId];
+    fetch('http://127.0.0.1:7242/ingest/322691c2-8233-44c2-b3fb-a0bb278aacee',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.js:submit_tie_choice',message:'after store',data:{choice,bothSubmitted,choice1:c1,choice2:c2,sameChoice:c1&&c2&&c1===c2},timestamp:Date.now(),hypothesisId:'tie-H1'})}).catch(()=>{});
+    // #endregion
     if (bothSubmitted) resolveTieBreaker(room);
   });
 
